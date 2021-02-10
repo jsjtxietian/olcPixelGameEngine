@@ -1,9 +1,4 @@
-olcPixelGameEngine.h 
-
-+-------------------------------------------------------------+
-|           OneLoneCoder Pixel Game Engine v0.1               |
-| "Like the command prompt console one, but not..." - javidx9 |
-+-------------------------------------------------------------+
+# Learning Notes of javidx9's olcPixelEngine
 
 What is this?
 ~~~~~~~~~~~~~
@@ -78,43 +73,3 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Links
-~~~~~
-YouTube:	https://www.youtube.com/javidx9
-Discord:	https://discord.gg/WhwHUMV
-Twitter:	https://www.twitter.com/javidx9
-Twitch:		https://www.twitch.tv/javidx9
-GitHub:		https://www.github.com/onelonecoder
-Homepage:	https://www.onelonecoder.com
-
-Relevant Videos
-~~~~~~~~~~~~~~~
-
-
-Compiling in Linux
-~~~~~~~~~~~~~~~~~~
-You will need a modern C++ compiler, so update yours!
-To compile use the command: 
-
-g++ -o YourProgName YourSource.cpp -lX11 -lGL -lpthread -lpng
-
-Compiling in Code::Blocks on Windows
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Well I wont judge you, but make sure your Code::Blocks installation
-is really up to date - you may even consider updating your C++ toolchain
-to use MinGW32-W64, so google this. You will also need to enable C++14
-in your build options, and add to your linker the following libraries:
-user32 gdi32 opengl32 gdiplus
-
-Thanks
-~~~~~~
-I'd like to extend thanks to Eremiell, slavka, Phantim, JackOJC, 
-KrossX, Huhlig & MagetzUb for advice, ideas and testing, and I'd 
-like to extend my appreciation to the 13K YouTube followers 
-and 1K Discord server members who give me the motivation to keep 
-going with all this :D
-
-Author
-~~~~~~
-David Barr, aka javidx9, OneLoneCoder 2018

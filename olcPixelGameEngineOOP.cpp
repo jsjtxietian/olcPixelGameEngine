@@ -1,354 +1,10 @@
-
-#ifdef _WIN32
-// Link to libraries
-#ifndef __MINGW32__
-#pragma comment(lib, "user32.lib")	 // Visual Studio Only
-#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
-#pragma comment(lib, "opengl32.lib") // these libs to your linker input
-#pragma comment(lib, "gdiplus.lib")
-#else
-// In Code::Blocks, Select C++14 in your build options, and add the
-// following libs to your linker: user32 gdi32 opengl32 gdiplus
-#endif
-
-// Include WinAPI
-#include <windows.h>
-#include <gdiplus.h>
-
-// OpenGL Extension
-#include <GL/gl.h>
-typedef BOOL(WINAPI wglSwapInterval_t)(int interval);
-wglSwapInterval_t *wglSwapInterval;
-#else
-#include <GL/gl.h>
-#include <GL/glx.h>
-#include <X11/X.h>
-#include <X11/Xlib.h>
-#include <png.h>
-typedef int(glSwapInterval_t)(Display *dpy, GLXDrawable drawable, int interval);
-glSwapInterval_t *glSwapIntervalEXT;
-#endif
-
-// Standard includes
-#include <cmath>
-#include <cstdint>
-#include <string>
-#include <iostream>
-#include <chrono>
-#include <vector>
-#include <list>
-#include <thread>
-#include <atomic>
-#include <condition_variable>
-#include <fstream>
-#include <map>
-#ifndef __MINGW32__
-#include <codecvt> // Need GCC 5.1+ people...
-#endif
-
-namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
-{
-	struct Pixel
-	{
-		union
-		{
-			uint32_t n = 0xFF000000;
-			struct
-			{
-				uint8_t r;
-				uint8_t g;
-				uint8_t b;
-				uint8_t a;
-			};
-		};
-
-		Pixel();
-		Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha = 255);
-		enum Mode
-		{
-			NORMAL,
-			MASK,
-			ALPHA
-		};
-	};
-
-	// Some constants for symbolic naming of Pixels
-	static const Pixel
-		WHITE(255, 255, 255),
-		GREY(192, 192, 192), DARK_GREY(128, 128, 128), VERY_DARK_GREY(64, 64, 64),
-		RED(255, 0, 0), DARK_RED(128, 0, 0), VERY_DARK_RED(64, 0, 0),
-		YELLOW(255, 255, 0), DARK_YELLOW(128, 128, 0), VERY_DARK_YELLOW(64, 64, 0),
-		GREEN(0, 255, 0), DARK_GREEN(0, 128, 0), VERY_DARK_GREEN(0, 64, 0),
-		CYAN(0, 255, 255), DARK_CYAN(0, 128, 128), VERY_DARK_CYAN(0, 64, 64),
-		BLUE(0, 0, 255), DARK_BLUE(0, 0, 128), VERY_DARK_BLUE(0, 0, 64),
-		MAGENTA(255, 0, 255), DARK_MAGENTA(128, 0, 128), VERY_DARK_MAGENTA(64, 0, 64),
-		BLACK(0, 0, 0);
-
-	enum rcode
-	{
-		FAIL = 0,
-		OK = 1,
-		NO_FILE = -1,
-	};
-
-	//=============================================================
-
-	struct HWButton
-	{
-		bool bPressed = false;	// Set once during the frame the event occurs
-		bool bReleased = false; // Set once during the frame the event occurs
-		bool bHeld = false;		// Set tru for all frames between pressed and released events
-	};
-
-	//=============================================================
-
-	// A bitmap-like structure that stores a 2D array of Pixels
-	class Sprite
-	{
-	public:
-		Sprite();
-		Sprite(std::string sImageFile);
-		Sprite(int32_t w, int32_t h);
-		~Sprite();
-
-	public:
-		olc::rcode LoadFromFile(std::string sImageFile);
-
-	public:
-		int32_t width = 0;
-		int32_t height = 0;
-
-	public:
-		Pixel GetPixel(int32_t x, int32_t y);
-		void SetPixel(int32_t x, int32_t y, Pixel p);
-		Pixel Sample(float x, float y);
-		Pixel *GetData();
-
-	private:
-		Pixel *pColData = nullptr;
-	};
-
-	//=============================================================
-
-	enum Key
-	{
-		A,
-		B,
-		C,
-		D,
-		E,
-		F,
-		G,
-		H,
-		I,
-		J,
-		K,
-		L,
-		M,
-		N,
-		O,
-		P,
-		Q,
-		R,
-		S,
-		T,
-		U,
-		V,
-		W,
-		X,
-		Y,
-		Z,
-		K0,
-		K1,
-		K2,
-		K3,
-		K4,
-		K5,
-		K6,
-		K7,
-		K8,
-		K9,
-		F1,
-		F2,
-		F3,
-		F4,
-		F5,
-		F6,
-		F7,
-		F8,
-		F9,
-		F10,
-		F11,
-		F12,
-		UP,
-		DOWN,
-		LEFT,
-		RIGHT,
-		SPACE,
-		TAB,
-		LSHIFT,
-		RSHIFT,
-		LCTRL,
-		RCTRL,
-		LALT,
-		RALT,
-		INS,
-		DEL,
-		HOME,
-		END,
-		PGUP,
-		PGDN,
-		BACK,
-		ESCAPE,
-		ENTER,
-		PAUSE,
-		SCROLL,
-	};
-
-	//=============================================================
-
-	class PixelGameEngine
-	{
-	public:
-		PixelGameEngine();
-
-	public:
-		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h);
-		olc::rcode Start();
-
-	public: // Override Interfaces
-		// Called once on application startup, use to load your resources
-		virtual bool OnUserCreate();
-		// Called every frame, and provides you with a time per frame value
-		virtual bool OnUserUpdate(float fElapsedTime);
-		// Called once on application termination, so you can be a clean coder
-		virtual bool OnUserDestroy();
-
-	public: // Hardware Interfaces
-		// Returns true if window is currently in focus
-		bool IsFocused();
-		// Get the state of a specific keyboard button
-		HWButton GetKey(Key k);
-		// Get the state of a specific mouse button
-		HWButton GetMouse(char b);
-		// Get Mouse X coordinate in "pixel" space
-		int32_t GetMouseX();
-		// Get Mouse Y coordinate in "pixel" space
-		int32_t GetMouseY();
-
-	public: // Utility
-		// Returns the width of the screen in "pixels"
-		int32_t ScreenWidth();
-		// Returns the height of the screen in "pixels"
-		int32_t ScreenHeight();
-		// Returns the width of the currently selected drawing target in "pixels"
-		int32_t GetDrawTargetWidth();
-		// Returns the height of the currently selected drawing target in "pixels"
-		int32_t GetDrawTargetHeight();
-		// Returns the currently active draw target
-		Sprite *GetDrawTarget();
-
-	public: // Draw Routines
-		// Specify which Sprite should be the target of drawing functions, use nullptr
-		// to specify the primary screen
-		void SetDrawTarget(Sprite *target);
-		// Change the pixel mode for different optimisations
-		// olc::Pixel::NORMAL = No transparency
-		// olc::Pixel::MASK   = Transparent if alpha is < 255
-		// olc::Pixel::ALPHA  = Full transparency
-		void SetPixelMode(Pixel::Mode m);
-
-		// Draws a single Pixel
-		virtual void Draw(int32_t x, int32_t y, Pixel p);
-		// Draws a line from (x1,y1) to (x2,y2)
-		void DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p);
-		// Draws a circle located at (x,y) with radius
-		void DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p);
-		// Fills a circle located at (x,y) with radius
-		void FillCircle(int32_t x, int32_t y, int32_t radius, Pixel p);
-		// Draws a rectangle at (x,y) to (x+w,y+h)
-		void DrawRect(int32_t x, int32_t y, int32_t w, int32_t h, Pixel p);
-		// Fills a rectangle at (x,y) to (x+w,y+h)
-		void FillRect(int32_t x, int32_t y, int32_t w, int32_t h, Pixel p);
-		// Draws a triangle between points (x1,y1), (x2,y2) and (x3,y3)
-		void DrawTriangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, Pixel p);
-		// Flat fills a triangle between points (x1,y1), (x2,y2) and (x3,y3)
-		void FillTriangle(int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t x3, int32_t y3, Pixel p);
-		// Draws an entire sprite at location (x,y)
-		void DrawSprite(int32_t x, int32_t y, Sprite *sprite);
-		// Draws an area of a sprite at location (x,y), where the
-		// selected area is (ox,oy) to (ox+w,oy+h)
-		void DrawPartialSprite(int32_t x, int32_t y, Sprite *sprite, int32_t ox, int32_t oy, int32_t w, int32_t h);
-
-	public: // Branding
-		std::string sAppName;
-
-	private: // Inner mysterious workings
-		Sprite *pDefaultDrawTarget = nullptr;
-		Sprite *pDrawTarget = nullptr;
-		Pixel::Mode nPixelMode = Pixel::NORMAL;
-		uint32_t nScreenWidth = 256;
-		uint32_t nScreenHeight = 240;
-		uint32_t nPixelWidth = 4;
-		uint32_t nPixelHeight = 4;
-		uint32_t nMousePosX = 0;
-		uint32_t nMousePosY = 0;
-		bool bHasInputFocus = false;
-
-		static std::map<uint16_t, uint8_t> mapKeys;
-		bool pKeyNewState[256]{0};
-		bool pKeyOldState[256]{0};
-		HWButton pKeyboardState[256];
-
-		bool pMouseNewState[5]{0};
-		bool pMouseOldState[5]{0};
-		HWButton pMouseState[5];
-
-#ifdef _WIN32
-		HDC glDeviceContext = nullptr;
-		HGLRC glRenderContext = nullptr;
-#else
-		GLXContext glDeviceContext = nullptr;
-		GLXContext glRenderContext = nullptr;
-#endif
-		GLuint glBuffer;
-
-		void EngineThread();
-
-		// If anything sets this flag to false, the engine
-		// "should" shut down gracefully
-		static std::atomic<bool> bAtomActive;
-
-		// Common initialisation functions
-		void olc_UpdateMouse(uint32_t x, uint32_t y);
-		bool olc_OpenGLCreate();
-
-#ifdef _WIN32
-		// Windows specific window handling
-		HWND olc_hWnd = nullptr;
-		HWND olc_WindowCreate();
-		std::wstring wsAppName;
-		static LRESULT CALLBACK olc_WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-#else
-		// Non-Windows specific window handling
-		Display *olc_Display = nullptr;
-		Window olc_WindowRoot;
-		Window olc_Window;
-		XVisualInfo *olc_VisualInfo;
-		Colormap olc_ColourMap;
-		XSetWindowAttributes olc_SetWindowAttribs;
-		Display *olc_WindowCreate();
-#endif
-	};
-
-	//=============================================================
-} // namespace olc
-
-// For OOP heavy implementations, move below this line to a seperate "olcSimpleGameEngineOOP.cpp"
-// file, and include the above in to a seperate "olcSimpleGameEngineOOP.h" file
+#include "olcPixelGameEngineOOP.h"
 
 namespace olc
 {
+	//Pixel
+	//==========================================================
+
 	Pixel::Pixel()
 	{
 		r = 0;
@@ -365,6 +21,10 @@ namespace olc
 		a = alpha;
 	}
 
+	//End pixel
+	//==========================================================
+
+	//Sprite
 	//==========================================================
 
 	Sprite::Sprite()
@@ -398,19 +58,10 @@ namespace olc
 
 	olc::rcode Sprite::LoadFromFile(std::string sImageFile)
 	{
-#ifdef _WIN32
 		// Use GDI+
 		std::wstring wsImageFile;
-#ifdef __MINGW32__
-		wchar_t *buffer = new wchar_t[sImageFile.length() + 1];
-		mbstowcs(buffer, sImageFile.c_str(), sImageFile.length());
-		buffer[sImageFile.length()] = L'\0';
-		wsImageFile = buffer;
-		delete[] buffer;
-#else
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 		wsImageFile = converter.from_bytes(sImageFile);
-#endif
 		Gdiplus::Bitmap *bmp = Gdiplus::Bitmap::FromFile(wsImageFile.c_str());
 		if (bmp == nullptr)
 			return olc::NO_FILE;
@@ -427,94 +78,6 @@ namespace olc
 			}
 		delete bmp;
 		return olc::OK;
-#else
-		////////////////////////////////////////////////////////////////////////////
-		// Use libpng, Thanks to Guillaume Cottenceau
-		// https://gist.github.com/niw/5963798
-		png_structp png;
-		png_infop info;
-
-		FILE *f = fopen(sImageFile.c_str(), "rb");
-		if (!f)
-			return olc::NO_FILE;
-
-		png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-		if (!png)
-			goto fail_load;
-
-		info = png_create_info_struct(png);
-		if (!info)
-			goto fail_load;
-
-		if (setjmp(png_jmpbuf(png)))
-			goto fail_load;
-
-		png_init_io(png, f);
-		png_read_info(png, info);
-
-		png_byte color_type;
-		png_byte bit_depth;
-		png_bytep *row_pointers;
-		width = png_get_image_width(png, info);
-		height = png_get_image_height(png, info);
-		color_type = png_get_color_type(png, info);
-		bit_depth = png_get_bit_depth(png, info);
-
-#ifdef _DEBUG
-		std::cout << "Loading PNG: " << sImageFile << "\n";
-		std::cout << "W:" << width << " H:" << height << " D:" << (int)bit_depth << "\n";
-#endif
-
-		if (bit_depth == 16)
-			png_set_strip_16(png);
-		if (color_type == PNG_COLOR_TYPE_PALETTE)
-			png_set_palette_to_rgb(png);
-		if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
-			png_set_expand_gray_1_2_4_to_8(png);
-		if (png_get_valid(png, info, PNG_INFO_tRNS))
-			png_set_tRNS_to_alpha(png);
-		if (color_type == PNG_COLOR_TYPE_RGB ||
-			color_type == PNG_COLOR_TYPE_GRAY ||
-			color_type == PNG_COLOR_TYPE_PALETTE)
-			png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
-		if (color_type == PNG_COLOR_TYPE_GRAY ||
-			color_type == PNG_COLOR_TYPE_GRAY_ALPHA)
-			png_set_gray_to_rgb(png);
-
-		png_read_update_info(png, info);
-		row_pointers = (png_bytep *)malloc(sizeof(png_bytep) * height);
-		for (int y = 0; y < height; y++)
-		{
-			row_pointers[y] = (png_byte *)malloc(png_get_rowbytes(png, info));
-		}
-		png_read_image(png, row_pointers);
-		////////////////////////////////////////////////////////////////////////////
-
-		// Create sprite array
-		pColData = new Pixel[width * height];
-
-		// Iterate through image rows, converting into sprite format
-		for (int y = 0; y < height; y++)
-		{
-			png_bytep row = row_pointers[y];
-			for (int x = 0; x < width; x++)
-			{
-				png_bytep px = &(row[x * 4]);
-				SetPixel(x, y, Pixel(px[0], px[1], px[2], px[3]));
-			}
-		}
-
-		fclose(f);
-		return olc::OK;
-
-	fail_load:
-		width = 0;
-		height = 0;
-		fclose(f);
-		pColData = nullptr;
-		return olc::FAIL;
-
-#endif
 	}
 
 	Pixel Sprite::GetPixel(int32_t x, int32_t y)
@@ -540,6 +103,10 @@ namespace olc
 
 	Pixel *Sprite::GetData() { return pColData; }
 
+	//End sprite
+	//==========================================================
+
+	//End PixelGameEngine
 	//==========================================================
 
 	PixelGameEngine::PixelGameEngine()
@@ -554,11 +121,9 @@ namespace olc
 		nPixelWidth = pixel_w;
 		nPixelHeight = pixel_h;
 
-#ifdef _WIN32
 #ifdef UNICODE
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 		wsAppName = converter.from_bytes(sAppName);
-#endif
 #endif
 		// Create a sprite that represents the primary drawing target
 		pDefaultDrawTarget = new Sprite(nScreenWidth, nScreenHeight);
@@ -572,21 +137,15 @@ namespace olc
 		if (!olc_WindowCreate())
 			return olc::FAIL;
 
-			// Load libraries required for PNG file interaction
-#ifdef _WIN32
+		// Load libraries required for PNG file interaction
 		// Windows use GDI+
 		Gdiplus::GdiplusStartupInput startupInput;
 		ULONG_PTR token;
 		Gdiplus::GdiplusStartup(&token, &startupInput, NULL);
-#else
-			// Linux use libpng
-
-#endif
 		// Start the thread
 		bAtomActive = true;
 		std::thread t = std::thread(&PixelGameEngine::EngineThread, this);
 
-#ifdef _WIN32
 		// Handle Windows Message Loop
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0) > 0)
@@ -594,7 +153,6 @@ namespace olc
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
-#endif
 
 		// Wait for thread to be exited
 		t.join();
@@ -1199,57 +757,6 @@ namespace olc
 				// Our time per frame coefficient
 				float fElapsedTime = elapsedTime.count();
 
-#ifndef _WIN32
-				// Handle Xlib Message Loop - we do this in the
-				// same thread that OpenGL was created so we dont
-				// need to worry too much about multithreading with X11
-				XEvent xev;
-				while (XPending(olc_Display))
-				{
-					XNextEvent(olc_Display, &xev);
-					if (xev.type == Expose)
-					{
-						XWindowAttributes gwa;
-						XGetWindowAttributes(olc_Display, olc_Window, &gwa);
-						glViewport(0, 0, gwa.width, gwa.height);
-					}
-					else if (xev.type == KeyPress)
-					{
-						KeySym sym = XLookupKeysym(&xev.xkey, 0);
-						pKeyNewState[mapKeys[sym]] = true;
-					}
-					else if (xev.type == KeyRelease)
-					{
-						KeySym sym = XLookupKeysym(&xev.xkey, 0);
-						pKeyNewState[mapKeys[sym]] = false;
-					}
-					else if (xev.type == ButtonPress)
-					{
-						pMouseNewState[xev.xbutton.button] = true;
-					}
-					else if (xev.type == ButtonRelease)
-					{
-						pMouseNewState[xev.xbutton.button] = false;
-					}
-					else if (xev.type == MotionNotify)
-					{
-						olc_UpdateMouse(xev.xmotion.x, xev.xmotion.y);
-					}
-					else if (xev.type == FocusIn)
-					{
-						bHasInputFocus = true;
-					}
-					else if (xev.type == FocusOut)
-					{
-						bHasInputFocus = false;
-					}
-					else if (xev.type == ClientMessage)
-					{
-						bAtomActive = false;
-					}
-				}
-#endif
-
 				// Handle User Input - Keyboard
 				for (int i = 0; i < 256; i++)
 				{
@@ -1319,14 +826,9 @@ namespace olc
 				glEnd();
 
 				// Present Graphics to screen
-#ifdef _WIN32
 				SwapBuffers(glDeviceContext);
-#else
-				glXSwapBuffers(olc_Display, olc_Window);
-#endif
 
 				// Update Title Bar
-#ifdef _WIN32
 #ifdef UNICODE
 				wchar_t sTitle[256];
 				swprintf(sTitle, 256, L"OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", wsAppName.c_str(), 1.0f / fElapsedTime);
@@ -1335,11 +837,6 @@ namespace olc
 				char sTitle[256];
 				sprintf(sTitle, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", sAppName.c_str(), 1.0f / fElapsedTime);
 				SetWindowText(olc_hWnd, sTitle);
-#endif
-#else
-				char sTitle[256];
-				sprintf(sTitle, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", sAppName.c_str(), 1.0f / fElapsedTime);
-				XStoreName(olc_Display, olc_Window, sTitle);
 #endif
 			}
 
@@ -1355,18 +852,10 @@ namespace olc
 			}
 		}
 
-#ifdef _WIN32
 		wglDeleteContext(glRenderContext);
 		PostMessage(olc_hWnd, WM_DESTROY, 0, 0);
-#else
-		glXMakeCurrent(olc_Display, None, NULL);
-		glXDestroyContext(olc_Display, glDeviceContext);
-		XDestroyWindow(olc_Display, olc_Window);
-		XCloseDisplay(olc_Display);
-#endif
 	}
 
-#ifdef _WIN32
 	HWND PixelGameEngine::olc_WindowCreate()
 	{
 		WNDCLASS wc;
@@ -1561,130 +1050,12 @@ namespace olc
 		}
 		return DefWindowProc(hWnd, uMsg, wParam, lParam);
 	}
-#else
-	// Do the Linux stuff!
-	Display *PixelGameEngine::olc_WindowCreate()
-	{
-		XInitThreads();
-
-		// Grab the deafult display and window
-		olc_Display = XOpenDisplay(NULL);
-		olc_WindowRoot = DefaultRootWindow(olc_Display);
-
-		// Based on the display capabilities, configure the appearance of the window
-		GLint olc_GLAttribs[] = {GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
-		olc_VisualInfo = glXChooseVisual(olc_Display, 0, olc_GLAttribs);
-		olc_ColourMap = XCreateColormap(olc_Display, olc_WindowRoot, olc_VisualInfo->visual, AllocNone);
-		olc_SetWindowAttribs.colormap = olc_ColourMap;
-
-		// Register which events we are interested in receiving
-		olc_SetWindowAttribs.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask;
-
-		// Create the window
-		olc_Window = XCreateWindow(olc_Display, olc_WindowRoot, 0, 0, nScreenWidth * nPixelWidth, nScreenHeight * nPixelHeight, 0, olc_VisualInfo->depth, InputOutput, olc_VisualInfo->visual, CWColormap | CWEventMask, &olc_SetWindowAttribs);
-
-		Atom wmDelete = XInternAtom(olc_Display, "WM_DELETE_WINDOW", true);
-		XSetWMProtocols(olc_Display, olc_Window, &wmDelete, 1);
-
-		XMapWindow(olc_Display, olc_Window);
-		XStoreName(olc_Display, olc_Window, "OneLoneCoder.com - Pixel Game Engine");
-
-		// Create Keyboard Mapping
-		mapKeys[0x61] = Key::A;
-		mapKeys[0x62] = Key::B;
-		mapKeys[0x63] = Key::C;
-		mapKeys[0x64] = Key::D;
-		mapKeys[0x65] = Key::E;
-		mapKeys[0x66] = Key::F;
-		mapKeys[0x67] = Key::G;
-		mapKeys[0x68] = Key::H;
-		mapKeys[0x69] = Key::I;
-		mapKeys[0x6A] = Key::J;
-		mapKeys[0x6B] = Key::K;
-		mapKeys[0x6C] = Key::L;
-		mapKeys[0x6D] = Key::M;
-		mapKeys[0x6E] = Key::N;
-		mapKeys[0x6F] = Key::O;
-		mapKeys[0x70] = Key::P;
-		mapKeys[0x71] = Key::Q;
-		mapKeys[0x72] = Key::R;
-		mapKeys[0x73] = Key::S;
-		mapKeys[0x74] = Key::T;
-		mapKeys[0x75] = Key::U;
-		mapKeys[0x76] = Key::V;
-		mapKeys[0x77] = Key::W;
-		mapKeys[0x78] = Key::X;
-		mapKeys[0x79] = Key::Y;
-		mapKeys[0x7A] = Key::Z;
-
-		mapKeys[XK_F1] = Key::F1;
-		mapKeys[XK_F2] = Key::F2;
-		mapKeys[XK_F3] = Key::F3;
-		mapKeys[XK_F4] = Key::F4;
-		mapKeys[XK_F5] = Key::F5;
-		mapKeys[XK_F6] = Key::F6;
-		mapKeys[XK_F7] = Key::F7;
-		mapKeys[XK_F8] = Key::F8;
-		mapKeys[XK_F9] = Key::F9;
-		mapKeys[XK_F10] = Key::F10;
-		mapKeys[XK_F11] = Key::F11;
-		mapKeys[XK_F12] = Key::F12;
-
-		mapKeys[XK_Down] = Key::DOWN;
-		mapKeys[XK_Left] = Key::LEFT;
-		mapKeys[XK_Right] = Key::RIGHT;
-		mapKeys[XK_Up] = Key::UP;
-
-		mapKeys[XK_BackSpace] = Key::BACK;
-		mapKeys[XK_Escape] = Key::ESCAPE;
-		mapKeys[XK_Linefeed] = Key::ENTER;
-		mapKeys[XK_Pause] = Key::PAUSE;
-		mapKeys[XK_Scroll_Lock] = Key::SCROLL;
-		mapKeys[XK_Tab] = Key::TAB;
-		mapKeys[XK_Delete] = Key::DEL;
-		mapKeys[XK_Home] = Key::HOME;
-		mapKeys[XK_End] = Key::END;
-		mapKeys[XK_Page_Up] = Key::PGUP;
-		mapKeys[XK_Page_Down] = Key::PGDN;
-		mapKeys[XK_Insert] = Key::INS;
-		mapKeys[XK_Shift_L] = Key::LSHIFT;
-		mapKeys[XK_Shift_R] = Key::RSHIFT;
-		mapKeys[XK_Control_L] = Key::LCTRL;
-		mapKeys[XK_Control_R] = Key::RCTRL;
-		mapKeys[XK_space] = Key::SPACE;
-
-		mapKeys[XK_0] = Key::K0;
-		mapKeys[XK_1] = Key::K1;
-		mapKeys[XK_2] = Key::K2;
-		mapKeys[XK_3] = Key::K3;
-		mapKeys[XK_4] = Key::K4;
-		mapKeys[XK_5] = Key::K5;
-		mapKeys[XK_6] = Key::K6;
-		mapKeys[XK_7] = Key::K7;
-		mapKeys[XK_8] = Key::K8;
-		mapKeys[XK_9] = Key::K9;
-
-		return olc_Display;
-	}
-
-	bool PixelGameEngine::olc_OpenGLCreate()
-	{
-		glDeviceContext = glXCreateContext(olc_Display, olc_VisualInfo, nullptr, GL_TRUE);
-		glXMakeCurrent(olc_Display, olc_Window, glDeviceContext);
-		XWindowAttributes gwa;
-		XGetWindowAttributes(olc_Display, olc_Window, &gwa);
-		glViewport(0, 0, gwa.width, gwa.height);
-
-		glSwapIntervalEXT = (glSwapInterval_t *)glXGetProcAddress((unsigned char *)"glSwapIntervalEXT");
-		glSwapIntervalEXT(olc_Display, olc_Window, 0);
-		return true;
-	}
-
-#endif
 
 	// Need a couple of statics as these are singleton instances
 	// read from multiple locations
 	std::atomic<bool> PixelGameEngine::bAtomActive{false};
 	std::map<uint16_t, uint8_t> PixelGameEngine::mapKeys;
+
+	//End pixelGameEngine
 	//=============================================================
 } // namespace olc
