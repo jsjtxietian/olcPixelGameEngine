@@ -2,13 +2,14 @@
 #ifdef _WIN32
 	// Link to libraries
 	#ifndef __MINGW32__
-	#pragma comment(lib, "user32.lib")	 // Visual Studio Only
-	#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
-	#pragma comment(lib, "opengl32.lib") // these libs to your linker input
-	#pragma comment(lib, "gdiplus.lib")
+		#pragma comment(lib, "user32.lib")	 // Visual Studio Only
+		#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
+		#pragma comment(lib, "opengl32.lib") // these libs to your linker input
+		#pragma comment(lib, "gdiplus.lib")
 	#endif
 
 	// Include WinAPI
+	#define NOMINMAX	
 	#include <windows.h>
 	#include <gdiplus.h>
 

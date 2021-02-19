@@ -835,7 +835,7 @@ namespace olc
 				SetWindowText(olc_hWnd, sTitle);
 #else
 				char sTitle[256];
-				sprintf(sTitle, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", sAppName.c_str(), 1.0f / fElapsedTime);
+				sprintf_s(sTitle, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", sAppName.c_str(), 1.0f / fElapsedTime);
 				SetWindowText(olc_hWnd, sTitle);
 #endif
 			}
@@ -982,7 +982,8 @@ namespace olc
 				sizeof(PIXELFORMATDESCRIPTOR), 1,
 				PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
 				PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-				PFD_MAIN_PLANE, 0, 0, 0, 0};
+				PFD_MAIN_PLANE, 0, 0, 0, 0
+			};
 
 		int pf = 0;
 		if (!(pf = ChoosePixelFormat(glDeviceContext, &pfd)))
