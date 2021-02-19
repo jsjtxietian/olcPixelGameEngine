@@ -1,31 +1,21 @@
-
-#ifdef _WIN32
-	// Link to libraries
-	#ifndef __MINGW32__
-		#pragma comment(lib, "user32.lib")	 // Visual Studio Only
-		#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
-		#pragma comment(lib, "opengl32.lib") // these libs to your linker input
-		#pragma comment(lib, "gdiplus.lib")
-	#endif
-
-	// Include WinAPI
-	#define NOMINMAX	
-	#include <windows.h>
-	#include <gdiplus.h>
-
-	// OpenGL Extension
-	#include <GL/gl.h>
-	typedef BOOL(WINAPI wglSwapInterval_t)(int interval);
-	wglSwapInterval_t *wglSwapInterval;
-#else
-	#include <GL/gl.h>
-	#include <GL/glx.h>
-	#include <X11/X.h>
-	#include <X11/Xlib.h>
-	#include <png.h>
-	typedef int(glSwapInterval_t)(Display *dpy, GLXDrawable drawable, int interval);
-	glSwapInterval_t *glSwapIntervalEXT;
+// Link to libraries
+#ifndef __MINGW32__
+	#pragma comment(lib, "user32.lib")	 // Visual Studio Only
+	#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
+	#pragma comment(lib, "opengl32.lib") // these libs to your linker input
+	#pragma comment(lib, "gdiplus.lib")
 #endif
+
+// Include WinAPI
+#define NOMINMAX	
+#include <windows.h>
+#include <gdiplus.h>
+
+// OpenGL Extension
+#include <GL/gl.h>
+typedef BOOL(WINAPI wglSwapInterval_t)(int interval);
+wglSwapInterval_t *wglSwapInterval;
+
 
 // Standard includes
 #include <cmath>
@@ -300,13 +290,9 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		bool pMouseOldState[5]{0};
 		HWButton pMouseState[5];
 
-#ifdef _WIN32
 		HDC glDeviceContext = nullptr;
 		HGLRC glRenderContext = nullptr;
-#else
-		GLXContext glDeviceContext = nullptr;
-		GLXContext glRenderContext = nullptr;
-#endif
+
 		GLuint glBuffer;
 
 		void EngineThread();
@@ -319,22 +305,11 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		void olc_UpdateMouse(uint32_t x, uint32_t y);
 		bool olc_OpenGLCreate();
 
-#ifdef _WIN32
 		// Windows specific window handling
 		HWND olc_hWnd = nullptr;
 		HWND olc_WindowCreate();
 		std::wstring wsAppName;
 		static LRESULT CALLBACK olc_WindowEvent(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-#else
-		// Non-Windows specific window handling
-		Display *olc_Display = nullptr;
-		Window olc_WindowRoot;
-		Window olc_Window;
-		XVisualInfo *olc_VisualInfo;
-		Colormap olc_ColourMap;
-		XSetWindowAttributes olc_SetWindowAttribs;
-		Display *olc_WindowCreate();
-#endif
 	};
 
 	//=============================================================
