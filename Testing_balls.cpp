@@ -1,9 +1,8 @@
 /*
 OneLoneCoder.com - Programming Balls! #2 Circle Vs Edge Collisions
-"...totally overkill for pong..." - @Javidx9
 
-Video:
-~~~~~~
+Relevant Videos
+~~~~~~~~~~~~~~~
 Part #1 https://youtu.be/LPzyNOHY3A4
 Part #2 https://youtu.be/ebq7L2Wtbl4
 */
@@ -75,11 +74,14 @@ private:
         vecBalls.emplace_back(b);
     }
 
+    olc::Sprite spr;
+
 public:
     bool OnUserCreate()
     {
+
         float fBallRadius = 4.0f;
-        for (int i = 0; i < 300; i++)
+        for (int i = 0; i < 100; i++)
             AddBall(((float)rand() / (float)RAND_MAX) * ScreenWidth(), ((float)rand() / (float)RAND_MAX) * ScreenHeight(), fBallRadius);
 
         AddBall(28.0f, 33.0, fBallRadius * 3);
@@ -97,6 +99,7 @@ public:
 
     bool OnUserUpdate(float fElapsedTime)
     {
+
         auto DoCirclesOverlap = [](float x1, float y1, float r1, float x2, float y2, float r2) {
             return fabs((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)) <= ((r1 + r2) * (r1 + r2));
         };
@@ -410,7 +413,9 @@ public:
 
         // Draw Balls
         for (auto ball : vecBalls)
+        {
             FillCircle(ball.px, ball.py, ball.radius, ball.col);
+        }
 
         // Draw Cue
         if (pSelectedBall != nullptr)
@@ -422,8 +427,9 @@ public:
 
 int main()
 {
+
     CirclePhysics game;
-    if (game.Construct(640, 480, 2, 2))
+    if (game.Construct(320, 240, 4, 4))
         game.Start();
     else
         wcout << L"Could not construct console" << endl;

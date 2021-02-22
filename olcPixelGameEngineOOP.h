@@ -1,13 +1,13 @@
 // Link to libraries
-#ifndef __MINGW32__
-	#pragma comment(lib, "user32.lib")	 // Visual Studio Only
-	#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
-	#pragma comment(lib, "opengl32.lib") // these libs to your linker input
-	#pragma comment(lib, "gdiplus.lib")
-#endif
+#pragma comment(lib, "user32.lib")	 // Visual Studio Only
+#pragma comment(lib, "gdi32.lib")	 // For other Windows Compilers please add
+#pragma comment(lib, "opengl32.lib") // these libs to your linker input
+#pragma comment(lib, "gdiplus.lib")
 
 // Include WinAPI
-#define NOMINMAX	
+#define NOMINMAX
+#define min(a, b) ((a < b) ? a : b)
+#define max(a, b) ((a > b) ? a : b)
 #include <windows.h>
 #include <gdiplus.h>
 
@@ -15,7 +15,6 @@
 #include <GL/gl.h>
 typedef BOOL(WINAPI wglSwapInterval_t)(int interval);
 wglSwapInterval_t *wglSwapInterval;
-
 
 // Standard includes
 #include <cmath>
@@ -265,9 +264,12 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// Draws an area of a sprite at location (x,y), where the
 		// selected area is (ox,oy) to (ox+w,oy+h)
 		void DrawPartialSprite(int32_t x, int32_t y, Sprite *sprite, int32_t ox, int32_t oy, int32_t w, int32_t h);
+		// Draws a single line of text
+		void DrawString(int32_t x, int32_t y, std::string sText);
 
 	public: // Branding
 		std::string sAppName;
+		Sprite *fontSprite = nullptr;
 
 	private: // Inner mysterious workings
 		Sprite *pDefaultDrawTarget = nullptr;
@@ -280,6 +282,9 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		uint32_t nMousePosX = 0;
 		uint32_t nMousePosY = 0;
 		bool bHasInputFocus = false;
+		float fFrameTimer = 1.0f;
+		int nFrameCount = 0;
+		// Sprite *fontSprite = nullptr;
 
 		static std::map<uint16_t, uint8_t> mapKeys;
 		bool pKeyNewState[256]{0};
@@ -304,6 +309,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// Common initialisation functions
 		void olc_UpdateMouse(uint32_t x, uint32_t y);
 		bool olc_OpenGLCreate();
+		void olc_ConstructFontSheet();
 
 		// Windows specific window handling
 		HWND olc_hWnd = nullptr;

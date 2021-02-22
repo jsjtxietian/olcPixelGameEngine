@@ -125,6 +125,9 @@ namespace olc
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 		wsAppName = converter.from_bytes(sAppName);
 #endif
+		// Load the default font sheet
+		olc_ConstructFontSheet();
+
 		// Create a sprite that represents the primary drawing target
 		pDefaultDrawTarget = new Sprite(nScreenWidth, nScreenHeight);
 		SetDrawTarget(nullptr);
@@ -694,6 +697,18 @@ namespace olc
 		}
 	}
 
+	void PixelGameEngine::DrawString(int32_t x, int32_t y, std::string sText)
+	{
+		int32_t s = 0;
+		for (auto c : sText)
+		{
+			int32_t ox = (c - 32) % 16;
+			int32_t oy = (c - 32) / 16;
+			DrawPartialSprite(x + s, y, fontSprite, ox * 8, oy * 8, 8, 8);
+			s += 8;
+		}
+	}
+
 	void PixelGameEngine::SetPixelMode(Pixel::Mode m)
 	{
 		nPixelMode = m;
@@ -829,15 +844,21 @@ namespace olc
 				SwapBuffers(glDeviceContext);
 
 				// Update Title Bar
+				fFrameTimer += fElapsedTime;
+				nFrameCount++;
+				if (fFrameTimer >= 1.0f)
+				{
+					fFrameTimer -= 1.0f;
 #ifdef UNICODE
-				wchar_t sTitle[256];
-				swprintf(sTitle, 256, L"OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", wsAppName.c_str(), 1.0f / fElapsedTime);
-				SetWindowText(olc_hWnd, sTitle);
+					wchar_t sTitle[256];
+					swprintf(sTitle, 256, L"OneLoneCoder.com - Pixel Game Engine - %s - FPS: %d", wsAppName.c_str(), nFrameCount);
 #else
-				char sTitle[256];
-				sprintf_s(sTitle, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %3.2f", sAppName.c_str(), 1.0f / fElapsedTime);
-				SetWindowText(olc_hWnd, sTitle);
+					char sTitle[256];
+					sprintf_s(sTitle, 256, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %d", sAppName.c_str(), nFrameCount);
 #endif
+					SetWindowText(olc_hWnd, sTitle);
+					nFrameCount = 0;
+				}
 			}
 
 			// Allow the user to free resources if they have overrided the destroy function
@@ -854,6 +875,49 @@ namespace olc
 
 		wglDeleteContext(glRenderContext);
 		PostMessage(olc_hWnd, WM_DESTROY, 0, 0);
+	}
+
+	void PixelGameEngine::olc_ConstructFontSheet()
+	{
+		std::string data;
+		data += "?Q`0001oOch0o01o@F40o0<AGD4090LAGD<090@A7ch0?00O7Q`0600>00000000";
+		data += "O000000nOT0063Qo4d8>?7a14Gno94AA4gno94AaOT0>o3`oO400o7QN00000400";
+		data += "Of80001oOg<7O7moBGT7O7lABET024@aBEd714AiOdl717a_=TH013Q>00000000";
+		data += "720D000V?V5oB3Q_HdUoE7a9@DdDE4A9@DmoE4A;Hg]oM4Aj8S4D84@`00000000";
+		data += "OaPT1000Oa`^13P1@AI[?g`1@A=[OdAoHgljA4Ao?WlBA7l1710007l100000000";
+		data += "ObM6000oOfMV?3QoBDD`O7a0BDDH@5A0BDD<@5A0BGeVO5ao@CQR?5Po00000000";
+		data += "Oc``000?Ogij70PO2D]??0Ph2DUM@7i`2DTg@7lh2GUj?0TO0C1870T?00000000";
+		data += "70<4001o?P<7?1QoHg43O;`h@GT0@:@LB@d0>:@hN@L0@?aoN@<0O7ao0000?000";
+		data += "OcH0001SOglLA7mg24TnK7ln24US>0PL24U140PnOgl0>7QgOcH0K71S0000A000";
+		data += "00H00000@Dm1S007@DUSg00?OdTnH7YhOfTL<7Yh@Cl0700?@Ah0300700000000";
+		data += "<008001QL00ZA41a@6HnI<1i@FHLM81M@@0LG81?O`0nC?Y7?`0ZA7Y300080000";
+		data += "O`082000Oh0827mo6>Hn?Wmo?6HnMb11MP08@C11H`08@FP0@@0004@000000000";
+		data += "00P00001Oab00003OcKP0006@6=PMgl<@440MglH@000000`@000001P00000000";
+		data += "Ob@8@@00Ob@8@Ga13R@8Mga172@8?PAo3R@827QoOb@820@0O`0007`0000007P0";
+		data += "O`000P08Od400g`<3V=P0G`673IP0`@3>1`00P@6O`P00g`<O`000GP800000000";
+		data += "?P9PL020O`<`N3R0@E4HC7b0@ET<ATB0@@l6C4B0O`H3N7b0?P01L3R000000020";
+
+		fontSprite = new olc::Sprite(128, 48);
+		int px = 0, py = 0;
+		for (int b = 0; b < 1024; b += 4)
+		{
+			uint32_t sym1 = (uint32_t)data[b + 0] - 48;
+			uint32_t sym2 = (uint32_t)data[b + 1] - 48;
+			uint32_t sym3 = (uint32_t)data[b + 2] - 48;
+			uint32_t sym4 = (uint32_t)data[b + 3] - 48;
+			uint32_t r = sym1 << 18 | sym2 << 12 | sym3 << 6 | sym4;
+
+			for (int i = 0; i < 24; i++)
+			{
+				int k = r & (1 << i) ? 255 : 0;
+				fontSprite->SetPixel(px, py, olc::Pixel(k, k, k));
+				if (++py == 48)
+				{
+					px++;
+					py = 0;
+				}
+			}
+		}
 	}
 
 	HWND PixelGameEngine::olc_WindowCreate()
@@ -982,8 +1046,7 @@ namespace olc
 				sizeof(PIXELFORMATDESCRIPTOR), 1,
 				PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
 				PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-				PFD_MAIN_PLANE, 0, 0, 0, 0
-			};
+				PFD_MAIN_PLANE, 0, 0, 0, 0};
 
 		int pf = 0;
 		if (!(pf = ChoosePixelFormat(glDeviceContext, &pfd)))
