@@ -33,6 +33,8 @@ static wglSwapInterval_t *wglSwapInterval;
 #include <fstream>
 #include <map>
 #include <codecvt>
+#include <functional>
+
 #undef min
 #undef max
 
@@ -54,11 +56,13 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 
 		Pixel();
 		Pixel(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha = 255);
+		Pixel(uint32_t p);
 		enum Mode
 		{
 			NORMAL,
 			MASK,
-			ALPHA
+			ALPHA,
+			CUSTOM
 		};
 	};
 
@@ -109,8 +113,14 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 	public:
 		int32_t width = 0;
 		int32_t height = 0;
+		enum Mode
+		{
+			NORMAL,
+			PERIODIC
+		};
 
 	public:
+		void SetSampleMode(olc::Sprite::Mode mode = olc::Sprite::Mode::NORMAL);
 		Pixel GetPixel(int32_t x, int32_t y);
 		void SetPixel(int32_t x, int32_t y, Pixel p);
 		Pixel Sample(float x, float y);
@@ -118,6 +128,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 
 	private:
 		Pixel *pColData = nullptr;
+		Mode modeSample = Mode::NORMAL;
 
 #ifdef OLC_DBG_OVERDRAW
 	public:
@@ -206,7 +217,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		PixelGameEngine();
 
 	public:
-		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, int32_t framerate = -1);
+		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h);
 		olc::rcode Start();
 
 	public: // Override Interfaces
@@ -250,8 +261,11 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// olc::Pixel::MASK   = Transparent if alpha is < 255
 		// olc::Pixel::ALPHA  = Full transparency
 		void SetPixelMode(Pixel::Mode m);
+		// Use a custom blend function
+		void SetPixelMode(std::function<olc::Pixel(const int x, const int y, const olc::Pixel &pSource, const olc::Pixel &pDest)> pixelMode);
 		// Change the blend factor form between 0.0f to 1.0f;
 		void SetPixelBlend(float fBlend);
+		// Offset texels by sub-pixel amount (advanced, do not use)
 		void SetSubPixelOffset(float ox, float oy);
 
 		// Draws a single Pixel
@@ -303,7 +317,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		int nFrameCount = 0;
 		float fFramePeriod = 0.0f;
 		Sprite *fontSprite = nullptr;
-
+		
+		std::function<olc::Pixel(const int x, const int y, const olc::Pixel &, const olc::Pixel &)> funcPixelMode;
 		static std::map<uint16_t, uint8_t> mapKeys;
 		bool pKeyNewState[256]{0};
 		bool pKeyOldState[256]{0};

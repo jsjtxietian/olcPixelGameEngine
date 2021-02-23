@@ -24,8 +24,23 @@ namespace olc
 		a = alpha;
 	}
 
+	Pixel::Pixel(uint32_t p)
+	{
+		n = p;
+	}
+
 	//End pixel
 	//==========================================================
+
+	std::wstring ConvertS2W(std::string s)
+	{
+		int count = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, NULL, 0);
+		wchar_t *buffer = new wchar_t[count];
+		MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, buffer, count);
+		std::wstring w(buffer);
+		delete[] buffer;
+		return w;
+	}
 
 	//Sprite
 	//==========================================================
@@ -65,8 +80,7 @@ namespace olc
 	{
 		// Use GDI+
 		std::wstring wsImageFile;
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-		wsImageFile = converter.from_bytes(sImageFile);
+		wsImageFile = ConvertS2W(sImageFile);
 		Gdiplus::Bitmap *bmp = Gdiplus::Bitmap::FromFile(wsImageFile.c_str());
 		if (bmp == nullptr)
 			return olc::NO_FILE;
@@ -90,12 +104,24 @@ namespace olc
 		return olc::FAIL;
 	}
 
+	void Sprite::SetSampleMode(olc::Sprite::Mode mode)
+	{
+		modeSample = mode;
+	}
+
 	Pixel Sprite::GetPixel(int32_t x, int32_t y)
 	{
-		if (x >= 0 && x < width && y >= 0 && y < height)
-			return pColData[y * width + x];
+		if (modeSample == olc::Sprite::Mode::NORMAL)
+		{
+			if (x >= 0 && x < width && y >= 0 && y < height)
+				return pColData[y * width + x];
+			else
+				return Pixel(0, 0, 0, 0);
+		}
 		else
-			return Pixel(0, 0, 0, 0);
+		{
+			return pColData[(y % height) * width + (x % width)];
+		}
 	}
 
 	void Sprite::SetPixel(int32_t x, int32_t y, Pixel p)
@@ -129,13 +155,12 @@ namespace olc
 		olc::PGEX::pge = this;
 	}
 
-	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, int32_t framerate)
+	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h)
 	{
 		nScreenWidth = screen_w;
 		nScreenHeight = screen_h;
 		nPixelWidth = pixel_w;
 		nPixelHeight = pixel_h;
-		fFramePeriod = 1.0f / (float)framerate;
 		fPixelX = 2.0f / (float)(nScreenWidth);
 		fPixelY = 2.0f / (float)(nScreenHeight);
 
@@ -143,8 +168,7 @@ namespace olc
 			return olc::FAIL;
 
 #ifdef UNICODE
-		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-		wsAppName = converter.from_bytes(sAppName);
+		wsAppName = ConvertS2W(sAppName);
 #endif
 		// Load the default font sheet
 		olc_ConstructFontSheet();
@@ -274,6 +298,12 @@ namespace olc
 			float g = a * (float)p.g + c * (float)d.g;
 			float b = a * (float)p.b + c * (float)d.b;
 			pDrawTarget->SetPixel(x, y, Pixel((uint8_t)r, (uint8_t)g, (uint8_t)b));
+			return;
+		}
+
+		if (nPixelMode == Pixel::CUSTOM)
+		{
+			pDrawTarget->SetPixel(x, y, funcPixelMode(x, y, p, pDrawTarget->GetPixel(x, y)));
 			return;
 		}
 	}
@@ -786,6 +816,12 @@ namespace olc
 #endif
 	}
 
+	void PixelGameEngine::SetPixelMode(std::function<olc::Pixel(const int x, const int y, const olc::Pixel &, const olc::Pixel &)> pixelMode)
+	{
+		funcPixelMode = pixelMode;
+		nPixelMode = Pixel::Mode::CUSTOM;
+	}
+
 	void PixelGameEngine::SetPixelMode(Pixel::Mode m)
 	{
 		nPixelMode = m;
@@ -829,6 +865,15 @@ namespace olc
 		// But leave in pixel space
 		nMousePosX = x / nPixelWidth;
 		nMousePosY = y / nPixelHeight;
+
+		if (nMousePosX < 0)
+			nMousePosX = 0;
+		if (nMousePosY < 0)
+			nMousePosY = 0;
+		if (nMousePosX >= nScreenWidth)
+			nMousePosX = nScreenWidth - 1;
+		if (nMousePosX >= nScreenHeight)
+			nMousePosY = nScreenHeight - 1;
 	}
 
 	void PixelGameEngine::EngineThread()
@@ -946,14 +991,12 @@ namespace olc
 				if (fFrameTimer >= 1.0f)
 				{
 					fFrameTimer -= 1.0f;
+					std::string sTitle = "Pixel Game Engine - " + sAppName + " - FPS: " + std::to_string(nFrameCount);
 #ifdef UNICODE
-					wchar_t sTitle[256];
-					swprintf(sTitle, 256, L"OneLoneCoder.com - Pixel Game Engine - %s - FPS: %d", wsAppName.c_str(), nFrameCount);
+					SetWindowText(olc_hWnd, ConvertS2W(sTitle).c_str());
 #else
-					char sTitle[256];
-					sprintf_s(sTitle, 256, "OneLoneCoder.com - Pixel Game Engine - %s - FPS: %d", sAppName.c_str(), nFrameCount);
+					SetWindowText(olc_hWnd, sTitle.c_str());
 #endif
-					SetWindowText(olc_hWnd, sTitle);
 					nFrameCount = 0;
 				}
 			}

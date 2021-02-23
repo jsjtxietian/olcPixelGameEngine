@@ -6,11 +6,11 @@ REM Optimization switches /O2 /Od
 set CommonCompilerFlags=-MTd -nologo -fp:fast -Gm- -GR- -EHa- -Od -Oi -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4458 -wd4706 -wd4244 -wd4267 -FC -Z7
 set CommonLinkerFlags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib opengl32.lib gdiplus.lib
 
-IF NOT EXIST .\build mkdir .\build
-del /S /Q .\build
-mkdir .\build
+IF NOT EXIST .\Build mkdir .\Build
+del /S /Q .\Build
+mkdir .\Build
 
-pushd .\build
+pushd .\Build
 cl %CommonCompilerFlags% ..\Example_ShadowCasting.cpp -Fmtesting.map -Fetesting.exe /link %CommonLinkerFlags%
 popd
 
