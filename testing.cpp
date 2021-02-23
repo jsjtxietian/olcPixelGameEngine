@@ -1,4 +1,6 @@
-#include "olcPixelGameEngineOOP.cpp"
+#define OLC_PGE_APPLICATION
+
+#include "PGE.cpp"
 
 class Example : public olc::PixelGameEngine
 {

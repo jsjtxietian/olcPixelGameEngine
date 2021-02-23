@@ -30,6 +30,8 @@ static wglSwapInterval_t *wglSwapInterval;
 #include <fstream>
 #include <map>
 #include <codecvt>
+#undef min
+#undef max
 
 namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 {
@@ -242,6 +244,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		void SetPixelMode(Pixel::Mode m);
 		// Change the blend factor form between 0.0f to 1.0f;
 		void SetPixelBlend(float fBlend);
+		void SetSubPixelOffset(float ox, float oy);
 
 		// Draws a single Pixel
 		virtual void Draw(int32_t x, int32_t y, Pixel p = olc::WHITE);
@@ -283,6 +286,10 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		uint32_t nPixelHeight = 4;
 		uint32_t nMousePosX = 0;
 		uint32_t nMousePosY = 0;
+		float fPixelX = 1.0f;
+		float fPixelY = 1.0f;
+		float fSubPixelOffsetX = 0.0f;
+		float fSubPixelOffsetY = 0.0f;
 		bool bHasInputFocus = false;
 		float fFrameTimer = 1.0f;
 		int nFrameCount = 0;

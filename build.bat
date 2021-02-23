@@ -11,7 +11,7 @@ del /S /Q .\build
 mkdir .\build
 
 pushd .\build
-cl %CommonCompilerFlags% ..\testing.cpp -Fmtesting.map -Fetesting.exe /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% ..\Example_GFX2D.cpp -Fmtesting.map -Fetesting.exe /link %CommonLinkerFlags%
 popd
 
 echo ----------------------

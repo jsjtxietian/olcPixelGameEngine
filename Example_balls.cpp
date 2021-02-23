@@ -12,7 +12,8 @@ Part #2 https://youtu.be/ebq7L2Wtbl4
 #include <algorithm>
 using namespace std;
 
-#include "olcPixelGameEngineOOP.cpp"
+#define OLC_PGE_APPLICATION
+#include "PGE.cpp"
 
 struct sBall
 {

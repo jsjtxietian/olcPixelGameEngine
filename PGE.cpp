@@ -1,6 +1,6 @@
 #pragma once
 
-#include "olcPixelGameEngineOOP.h"
+#include "PGE.h"
 
 namespace olc
 {
@@ -55,7 +55,7 @@ namespace olc
 	Sprite::~Sprite()
 	{
 		if (pColData)
-			delete[] pColData;
+			delete pColData;
 	}
 
 	// /NOTE! Currently on Windows olc::Sprites cannot be constructed in the constructor of any olc::PixelGameEngine derived class.
@@ -131,6 +131,8 @@ namespace olc
 		nPixelWidth = pixel_w;
 		nPixelHeight = pixel_h;
 		fFramePeriod = 1.0f / (float)framerate;
+		fPixelX = 2.0f / (float)(nScreenWidth);
+		fPixelY = 2.0f / (float)(nScreenHeight);
 
 		if (nPixelWidth == 0 || nPixelHeight == 0 || nScreenWidth == 0 || nScreenHeight == 0)
 			return olc::FAIL;
@@ -776,6 +778,12 @@ namespace olc
 			fBlendFactor = 1.0f;
 	}
 
+	void PixelGameEngine::SetSubPixelOffset(float ox, float oy)
+	{
+		fSubPixelOffsetX = ox * fPixelX;
+		fSubPixelOffsetY = oy * fPixelY;
+	}
+
 	// User must override these functions as required. I have not made
 	// them abstract because I do need a default behaviour to occur if
 	// they are not overwritten
@@ -894,13 +902,13 @@ namespace olc
 				// Display texture on screen
 				glBegin(GL_QUADS);
 				glTexCoord2f(0.0, 1.0);
-				glVertex3f(-1.0f, -1.0f, 0.0f);
+				glVertex3f(-1.0f + (fSubPixelOffsetX), -1.0f + (fSubPixelOffsetY), 0.0f);
 				glTexCoord2f(0.0, 0.0);
-				glVertex3f(-1.0f, 1.0f, 0.0f);
+				glVertex3f(-1.0f + (fSubPixelOffsetX), 1.0f + (fSubPixelOffsetY), 0.0f);
 				glTexCoord2f(1.0, 0.0);
-				glVertex3f(1.0f, 1.0f, 0.0f);
+				glVertex3f(1.0f + (fSubPixelOffsetX), 1.0f + (fSubPixelOffsetY), 0.0f);
 				glTexCoord2f(1.0, 1.0);
-				glVertex3f(1.0f, -1.0f, 0.0f);
+				glVertex3f(1.0f + (fSubPixelOffsetX), -1.0f + (fSubPixelOffsetY), 0.0f);
 				glEnd();
 
 				// Present Graphics to screen
@@ -1180,7 +1188,7 @@ namespace olc
 	// read from multiple locations
 	std::atomic<bool> PixelGameEngine::bAtomActive{false};
 	std::map<uint16_t, uint8_t> PixelGameEngine::mapKeys;
-	olc::PixelGameEngine* olc::PGEX::pge = nullptr;
+	olc::PixelGameEngine *olc::PGEX::pge = nullptr;
 
 	//End pixelGameEngine
 	//=============================================================
