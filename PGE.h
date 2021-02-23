@@ -306,18 +306,19 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		uint32_t nScreenHeight = 240;
 		uint32_t nPixelWidth = 4;
 		uint32_t nPixelHeight = 4;
-		uint32_t nMousePosX = 0;
-		uint32_t nMousePosY = 0;
+		int32_t nMousePosX = 0;
+		int32_t nMousePosY = 0;
 		float fPixelX = 1.0f;
 		float fPixelY = 1.0f;
 		float fSubPixelOffsetX = 0.0f;
 		float fSubPixelOffsetY = 0.0f;
 		bool bHasInputFocus = false;
+		bool bHasMouseFocus = false;
 		float fFrameTimer = 1.0f;
 		int nFrameCount = 0;
 		float fFramePeriod = 0.0f;
 		Sprite *fontSprite = nullptr;
-		
+
 		std::function<olc::Pixel(const int x, const int y, const olc::Pixel &, const olc::Pixel &)> funcPixelMode;
 		static std::map<uint16_t, uint8_t> mapKeys;
 		bool pKeyNewState[256]{0};
@@ -340,7 +341,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		static std::atomic<bool> bAtomActive;
 
 		// Common initialisation functions
-		void olc_UpdateMouse(uint32_t x, uint32_t y);
+		void olc_UpdateMouse(int32_t x, int32_t y);
 		bool olc_OpenGLCreate();
 		void olc_ConstructFontSheet();
 

@@ -120,7 +120,7 @@ namespace olc
 		}
 		else
 		{
-			return pColData[(y % height) * width + (x % width)];
+			return pColData[abs(y % height) * width + abs(x % width)];
 		}
 	}
 
@@ -313,6 +313,27 @@ namespace olc
 		int x, y, dx, dy, dx1, dy1, px, py, xe, ye, i;
 		dx = x2 - x1;
 		dy = y2 - y1;
+
+		// straight lines idea by gurkanctn
+		if (dx == 0) // Line is vertical
+		{
+			if (y2 < y1)
+				std::swap(y1, y2);
+			for (y = y1; y <= y2; y++)
+				Draw(x1, y, p);
+			return;
+		}
+
+		if (dy == 0) // Line is horizontal
+		{
+			if (x2 < x1)
+				std::swap(x1, x2);
+			for (x = x1; x <= x2; x++)
+				Draw(x, y1, p);
+			return;
+		}
+
+		// Line is Funk-aye
 		dx1 = abs(dx);
 		dy1 = abs(dy);
 		px = 2 * dy1 - dx1;
@@ -859,21 +880,22 @@ namespace olc
 	}
 	//////////////////////////////////////////////////////////////////
 
-	void PixelGameEngine::olc_UpdateMouse(uint32_t x, uint32_t y)
+	void PixelGameEngine::olc_UpdateMouse(int32_t x, int32_t y)
 	{
 		// Mouse coords come in screen space
 		// But leave in pixel space
-		nMousePosX = x / nPixelWidth;
-		nMousePosY = y / nPixelHeight;
+		nMousePosX = x / (int32_t)nPixelWidth;
+		nMousePosY = y / (int32_t)nPixelHeight;
+
+		if (nMousePosX >= (int32_t)nScreenWidth)
+			nMousePosX = nScreenWidth - 1;
+		if (nMousePosY >= (int32_t)nScreenHeight)
+			nMousePosY = nScreenHeight - 1;
 
 		if (nMousePosX < 0)
 			nMousePosX = 0;
 		if (nMousePosY < 0)
 			nMousePosY = 0;
-		if (nMousePosX >= nScreenWidth)
-			nMousePosX = nScreenWidth - 1;
-		if (nMousePosX >= nScreenHeight)
-			nMousePosY = nScreenHeight - 1;
 	}
 
 	void PixelGameEngine::EngineThread()
@@ -1211,8 +1233,16 @@ namespace olc
 			sge = (PixelGameEngine *)((LPCREATESTRUCT)lParam)->lpCreateParams;
 			return 0;
 		case WM_MOUSEMOVE:
-			sge->olc_UpdateMouse(LOWORD(lParam), HIWORD(lParam));
+		{
+			uint16_t x = lParam & 0xFFFF; // Thanks @ForAbby (Discord)
+			uint16_t y = (lParam >> 16) & 0xFFFF;
+			int16_t ix = *(int16_t *)&x;
+			int16_t iy = *(int16_t *)&y;
+			sge->olc_UpdateMouse(ix, iy);
 			return 0;
+		}
+		case WM_MOUSELEAVE:
+			sge->bHasMouseFocus = false;
 		case WM_SETFOCUS:
 			sge->bHasInputFocus = true;
 			return 0;
