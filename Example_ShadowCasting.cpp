@@ -323,7 +323,7 @@ public:
             world[x * nWorldWidth + (nWorldWidth - 2)].exist = true;
         }
 
-        sprLightCast = new olc::Sprite("light_cast.png");
+        sprLightCast = new olc::Sprite("./Assets/light_cast.png");
 
         // Create some screen-sized off-screen buffers for lighting effect
         buffLightTex = new olc::Sprite(ScreenWidth(), ScreenHeight());

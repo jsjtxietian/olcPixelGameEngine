@@ -3,7 +3,7 @@
 #include "PGE.cpp"
 
 // To use an extension, just include it
-#include "Graphics2D.h"
+#include "Extension_Graphics2D.h"
 
 class TestExtension : public olc::PixelGameEngine
 {
@@ -19,7 +19,7 @@ public:
 		for (int i = 0; i < 16; i++)
 			listEvents.push_back("");
 
-		spr = new olc::Sprite("logo_long.png");
+		spr = new olc::Sprite("./Assets/logo_long.png");
 
 		return true;
 	}
