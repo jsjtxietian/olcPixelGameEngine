@@ -1,3 +1,5 @@
+#pragma once
+
 #include "olcPixelGameEngineOOP.h"
 
 namespace olc
@@ -56,6 +58,8 @@ namespace olc
 			delete[] pColData;
 	}
 
+	// /NOTE! Currently on Windows olc::Sprites cannot be constructed in the constructor of any olc::PixelGameEngine derived class.
+	//The GDI Subsystem for loading PNG files needs to start before sprites can be loaded, so its important to only load sprites during or after OnUserCreate().
 	olc::rcode Sprite::LoadFromFile(std::string sImageFile)
 	{
 		// Use GDI+
@@ -80,12 +84,17 @@ namespace olc
 		return olc::OK;
 	}
 
+	olc::rcode Sprite::LoadFromSprFile(std::string sImageFile)
+	{
+		return olc::FAIL;
+	}
+
 	Pixel Sprite::GetPixel(int32_t x, int32_t y)
 	{
 		if (x >= 0 && x < width && y >= 0 && y < height)
 			return pColData[y * width + x];
 		else
-			return Pixel();
+			return Pixel(0, 0, 0, 0);
 	}
 
 	void Sprite::SetPixel(int32_t x, int32_t y, Pixel p)
@@ -112,14 +121,19 @@ namespace olc
 	PixelGameEngine::PixelGameEngine()
 	{
 		sAppName = "Undefined";
+		olc::PGEX::pge = this;
 	}
 
-	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h)
+	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, int32_t framerate)
 	{
 		nScreenWidth = screen_w;
 		nScreenHeight = screen_h;
 		nPixelWidth = pixel_w;
 		nPixelHeight = pixel_h;
+		fFramePeriod = 1.0f / (float)framerate;
+
+		if (nPixelWidth == 0 || nPixelHeight == 0 || nScreenWidth == 0 || nScreenHeight == 0)
+			return olc::FAIL;
 
 #ifdef UNICODE
 		std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
@@ -201,7 +215,7 @@ namespace olc
 		return pKeyboardState[k];
 	}
 
-	HWButton PixelGameEngine::GetMouse(char b)
+	HWButton PixelGameEngine::GetMouse(uint32_t b)
 	{
 		return pMouseState[b];
 	}
@@ -239,7 +253,7 @@ namespace olc
 
 		if (nPixelMode == Pixel::MASK)
 		{
-			if (p.a != 255)
+			if (p.a == 255)
 				pDrawTarget->SetPixel(x, y, p);
 			return;
 		}
@@ -247,7 +261,7 @@ namespace olc
 		if (nPixelMode == Pixel::ALPHA)
 		{
 			Pixel d = pDrawTarget->GetPixel(x, y);
-			float a = (float)p.a / 255.0f;
+			float a = (float)(p.a / 255.0f) * fBlendFactor;
 			float c = 1.0f - a;
 			float r = a * (float)p.r + c * (float)d.r;
 			float g = a * (float)p.g + c * (float)d.g;
@@ -697,21 +711,69 @@ namespace olc
 		}
 	}
 
-	void PixelGameEngine::DrawString(int32_t x, int32_t y, std::string sText)
+	void PixelGameEngine::DrawString(int32_t x, int32_t y, std::string sText, Pixel col, uint32_t scale)
 	{
-		int32_t s = 0;
+		int32_t sx = 0;
+		int32_t sy = 0;
+		Pixel::Mode m = nPixelMode;
+		if (col.a != 255)
+			SetPixelMode(Pixel::ALPHA);
+		else
+			SetPixelMode(Pixel::MASK);
 		for (auto c : sText)
 		{
-			int32_t ox = (c - 32) % 16;
-			int32_t oy = (c - 32) / 16;
-			DrawPartialSprite(x + s, y, fontSprite, ox * 8, oy * 8, 8, 8);
-			s += 8;
+			if (c == '\n')
+			{
+				sx = 0;
+				sy += 8 * scale;
+			}
+			else
+			{
+				int32_t ox = (c - 32) % 16;
+				int32_t oy = (c - 32) / 16;
+
+				if (scale > 1)
+				{
+					for (uint32_t i = 0; i < 8; i++)
+						for (uint32_t j = 0; j < 8; j++)
+							if (fontSprite->GetPixel(i + ox * 8, j + oy * 8).r > 0)
+								for (uint32_t is = 0; is < scale; is++)
+									for (uint32_t js = 0; js < scale; js++)
+										Draw(x + sx + (i * scale) + is, y + sy + (j * scale) + js, col);
+				}
+				else
+				{
+					for (uint32_t i = 0; i < 8; i++)
+						for (uint32_t j = 0; j < 8; j++)
+							if (fontSprite->GetPixel(i + ox * 8, j + oy * 8).r > 0)
+								Draw(x + sx + i, y + sy + j, col);
+				}
+				sx += 8 * scale;
+			}
 		}
+		SetPixelMode(m);
+	}
+
+	void PixelGameEngine::Clear(Pixel p)
+	{
+		int pixels = GetDrawTargetWidth() * GetDrawTargetHeight();
+		Pixel *m = GetDrawTarget()->GetData();
+		for (int i = 0; i < pixels; i++)
+			m[i] = p;
 	}
 
 	void PixelGameEngine::SetPixelMode(Pixel::Mode m)
 	{
 		nPixelMode = m;
+	}
+
+	void PixelGameEngine::SetPixelBlend(float fBlend)
+	{
+		fBlendFactor = fBlend;
+		if (fBlendFactor < 0.0f)
+			fBlendFactor = 0.0f;
+		if (fBlendFactor > 1.0f)
+			fBlendFactor = 1.0f;
 	}
 
 	// User must override these functions as required. I have not made
@@ -751,6 +813,7 @@ namespace olc
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, nScreenWidth, nScreenHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pDefaultDrawTarget->GetData());
 
 		// Create user resources as part of this thread
 		if (!OnUserCreate())
@@ -824,9 +887,9 @@ namespace olc
 
 				// Display Graphics
 
-				// TODO: This is a bit slow (especially in debug, but 100x faster in release mode???)
 				// Copy pixel array into texture
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, nScreenWidth, nScreenHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, pDefaultDrawTarget->GetData());
+				// https://stackoverflow.com/questions/2405734/difference-between-gltexsubimage-and-glteximage-function-in-opengl?answertab=oldest#tab-top
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, nScreenWidth, nScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pDefaultDrawTarget->GetData());
 
 				// Display texture on screen
 				glBegin(GL_QUADS);
@@ -953,10 +1016,10 @@ namespace olc
 
 #ifdef UNICODE
 		olc_hWnd = CreateWindowEx(dwExStyle, L"OLC_PIXEL_GAME_ENGINE", L"", dwStyle,
-								  CW_USEDEFAULT, CW_USEDEFAULT, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
+								  30, 30, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
 #else
 		olc_hWnd = CreateWindowEx(dwExStyle, "OLC_PIXEL_GAME_ENGINE", "", dwStyle,
-								  CW_USEDEFAULT, CW_USEDEFAULT, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
+								  30, 30, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
 #endif
 
 		// Create Keyboard Mapping
@@ -1017,10 +1080,8 @@ namespace olc
 		mapKeys[VK_PRIOR] = Key::PGUP;
 		mapKeys[VK_NEXT] = Key::PGDN;
 		mapKeys[VK_INSERT] = Key::INS;
-		mapKeys[VK_LSHIFT] = Key::LSHIFT;
-		mapKeys[VK_RSHIFT] = Key::RSHIFT;
-		mapKeys[VK_LCONTROL] = Key::LCTRL;
-		mapKeys[VK_RCONTROL] = Key::RCTRL;
+		mapKeys[VK_SHIFT] = Key::SHIFT;
+		mapKeys[VK_CONTROL] = Key::CTRL;
 		mapKeys[VK_SPACE] = Key::SPACE;
 
 		mapKeys[0x30] = Key::K0;
@@ -1119,6 +1180,7 @@ namespace olc
 	// read from multiple locations
 	std::atomic<bool> PixelGameEngine::bAtomActive{false};
 	std::map<uint16_t, uint8_t> PixelGameEngine::mapKeys;
+	olc::PixelGameEngine* olc::PGEX::pge = nullptr;
 
 	//End pixelGameEngine
 	//=============================================================
