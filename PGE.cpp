@@ -1,6 +1,7 @@
-#pragma once
-
 #include "PGE.h"
+
+#ifdef OLC_PGE_APPLICATION
+#undef OLC_PGE_APPLICATION
 
 namespace olc
 {
@@ -99,6 +100,10 @@ namespace olc
 
 	void Sprite::SetPixel(int32_t x, int32_t y, Pixel p)
 	{
+#ifdef OLC_DBG_OVERDRAW
+		nOverdrawCount++;
+#endif
+
 		if (x >= 0 && x < width && y >= 0 && y < height)
 			pColData[y * width + x] = p;
 	}
@@ -685,31 +690,45 @@ namespace olc
 		}
 	}
 
-	void PixelGameEngine::DrawSprite(int32_t x, int32_t y, Sprite *sprite)
+	void PixelGameEngine::DrawSprite(int32_t x, int32_t y, Sprite *sprite, uint32_t scale)
 	{
 		if (sprite == nullptr)
 			return;
 
-		for (int i = 0; i < sprite->width; i++)
+		if (scale > 1)
 		{
-			for (int j = 0; j < sprite->height; j++)
-			{
-				Draw(x + i, y + j, sprite->GetPixel(i, j));
-			}
+			for (int32_t i = 0; i < sprite->width; i++)
+				for (int32_t j = 0; j < sprite->height; j++)
+					for (uint32_t is = 0; is < scale; is++)
+						for (uint32_t js = 0; js < scale; js++)
+							Draw(x + (i * scale) + is, y + (j * scale) + js, sprite->GetPixel(i, j));
+		}
+		else
+		{
+			for (int32_t i = 0; i < sprite->width; i++)
+				for (int32_t j = 0; j < sprite->height; j++)
+					Draw(x + i, y + j, sprite->GetPixel(i, j));
 		}
 	}
 
-	void PixelGameEngine::DrawPartialSprite(int32_t x, int32_t y, Sprite *sprite, int32_t ox, int32_t oy, int32_t w, int32_t h)
+	void PixelGameEngine::DrawPartialSprite(int32_t x, int32_t y, Sprite *sprite, int32_t ox, int32_t oy, int32_t w, int32_t h, uint32_t scale)
 	{
 		if (sprite == nullptr)
 			return;
 
-		for (int i = 0; i < w; i++)
+		if (scale > 1)
 		{
-			for (int j = 0; j < h; j++)
-			{
-				Draw(x + i, y + j, sprite->GetPixel(i + ox, j + oy));
-			}
+			for (int32_t i = 0; i < w; i++)
+				for (int32_t j = 0; j < h; j++)
+					for (uint32_t is = 0; is < scale; is++)
+						for (uint32_t js = 0; js < scale; js++)
+							Draw(x + (i * scale) + is, y + (j * scale) + js, sprite->GetPixel(i + ox, j + oy));
+		}
+		else
+		{
+			for (int32_t i = 0; i < w; i++)
+				for (int32_t j = 0; j < h; j++)
+					Draw(x + i, y + j, sprite->GetPixel(i + ox, j + oy));
 		}
 	}
 
@@ -762,6 +781,9 @@ namespace olc
 		Pixel *m = GetDrawTarget()->GetData();
 		for (int i = 0; i < pixels; i++)
 			m[i] = p;
+#ifdef OLC_DBG_OVERDRAW
+		olc::Sprite::nOverdrawCount += pixels;
+#endif
 	}
 
 	void PixelGameEngine::SetPixelMode(Pixel::Mode m)
@@ -888,6 +910,10 @@ namespace olc
 
 					pMouseOldState[i] = pMouseNewState[i];
 				}
+
+#ifdef OLC_DBG_OVERDRAW
+				olc::Sprite::nOverdrawCount = 0;
+#endif
 
 				// Handle Frame Update
 				if (!OnUserUpdate(fElapsedTime))
@@ -1190,6 +1216,12 @@ namespace olc
 	std::map<uint16_t, uint8_t> PixelGameEngine::mapKeys;
 	olc::PixelGameEngine *olc::PGEX::pge = nullptr;
 
+#ifdef OLC_DBG_OVERDRAW
+	int olc::Sprite::nOverdrawCount = 0;
+#endif
+
 	//End pixelGameEngine
 	//=============================================================
 } // namespace olc
+
+#endif
