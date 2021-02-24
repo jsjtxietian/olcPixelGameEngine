@@ -6,7 +6,7 @@
 */
 
 #define OLC_PGE_APPLICATION
-#include "PGE.cpp"
+#include "PGE.h"
 
 #include <algorithm>
 #undef min

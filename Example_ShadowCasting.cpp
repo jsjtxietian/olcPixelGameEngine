@@ -23,7 +23,7 @@
 using namespace std;
 
 #define OLC_PGE_APPLICATION
-#include "PGE.cpp"
+#include "PGE.h"
 
 struct sEdge
 {

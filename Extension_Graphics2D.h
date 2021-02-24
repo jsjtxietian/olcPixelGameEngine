@@ -14,8 +14,6 @@
 #ifndef OLC_PGEX_GFX2D
 #define OLC_PGEX_GFX2D
 
-#include "PGE.cpp"
-
 #include <algorithm>
 
 namespace olc

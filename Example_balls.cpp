@@ -13,7 +13,7 @@ Part #2 https://youtu.be/ebq7L2Wtbl4
 using namespace std;
 
 #define OLC_PGE_APPLICATION
-#include "PGE.cpp"
+#include "PGE.h"
 
 struct sBall
 {

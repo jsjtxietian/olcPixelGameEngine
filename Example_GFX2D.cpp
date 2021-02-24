@@ -1,6 +1,6 @@
 #define OLC_PGE_APPLICATION
 // Include the olcPixelGameEngine
-#include "PGE.cpp"
+#include "PGE.h"
 
 // To use an extension, just include it
 #include "Extension_Graphics2D.h"
