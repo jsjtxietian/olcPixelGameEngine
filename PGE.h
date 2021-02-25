@@ -239,6 +239,21 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		ENTER,
 		PAUSE,
 		SCROLL,
+		NP0,
+		NP1,
+		NP2,
+		NP3,
+		NP4,
+		NP5,
+		NP6,
+		NP7,
+		NP8,
+		NP9,
+		NP_MUL,
+		NP_DIV,
+		NP_ADD,
+		NP_SUB,
+		NP_DECIMAL,
 	};
 
 	//=============================================================
@@ -293,6 +308,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// olc::Pixel::MASK   = Transparent if alpha is < 255
 		// olc::Pixel::ALPHA  = Full transparency
 		void SetPixelMode(Pixel::Mode m);
+		Pixel::Mode GetPixelMode();
 		// Use a custom blend function
 		void SetPixelMode(std::function<olc::Pixel(const int x, const int y, const olc::Pixel &pSource, const olc::Pixel &pDest)> pixelMode);
 		// Change the blend factor form between 0.0f to 1.0f;
@@ -529,7 +545,8 @@ namespace olc
 		}
 		else
 		{
-			std::istream is(&(pack->GetStreamBuffer(sImageFile)));
+			auto streamBuffer = pack->GetStreamBuffer(sImageFile);
+			std::istream is(&streamBuffer);
 			ReadData(is);
 		}
 
@@ -622,10 +639,10 @@ namespace olc
 		// Create entry
 		sEntry e;
 		e.data = nullptr;
-		e.nFileSize = p;
+		e.nFileSize = (uint32_t)p;
 
 		// Read file into memory
-		e.data = new uint8_t[e.nFileSize];
+		e.data = new uint8_t[(uint32_t)e.nFileSize];
 		ifs.read((char *)e.data, e.nFileSize);
 		ifs.close();
 
@@ -657,7 +674,7 @@ namespace olc
 		std::streampos offset = ofs.tellp();
 		for (auto &e : mapFiles)
 		{
-			e.second.nFileOffset = offset;
+			e.second.nFileOffset = (uint32_t)offset;
 			ofs.write((char *)e.second.data, e.second.nFileSize);
 			offset += e.second.nFileSize;
 		}
@@ -708,12 +725,10 @@ namespace olc
 		// 2) Read Data
 		for (auto &e : mapFiles)
 		{
-			e.second.data = new uint8_t[e.second.nFileSize];
+			e.second.data = new uint8_t[(uint32_t)e.second.nFileSize];
 			ifs.seekg(e.second.nFileOffset);
 			ifs.read((char *)e.second.data, e.second.nFileSize);
-			//e.second.setg
 			e.second._config();
-			//e.second.pubsetbuf((char*)e.second.data, e.second.nFileSize);
 		}
 
 		ifs.close();
@@ -1441,6 +1456,11 @@ namespace olc
 		nPixelMode = m;
 	}
 
+	Pixel::Mode PixelGameEngine::GetPixelMode()
+	{
+		return nPixelMode;
+	}
+
 	void PixelGameEngine::SetPixelBlend(float fBlend)
 	{
 		fBlendFactor = fBlend;
@@ -1759,6 +1779,7 @@ namespace olc
 		mapKeys[VK_LEFT] = Key::LEFT;
 		mapKeys[VK_RIGHT] = Key::RIGHT;
 		mapKeys[VK_UP] = Key::UP;
+		mapKeys[VK_RETURN] = Key::ENTER; //mapKeys[VK_RETURN] = Key::RETURN;
 
 		mapKeys[VK_BACK] = Key::BACK;
 		mapKeys[VK_ESCAPE] = Key::ESCAPE;
@@ -1786,6 +1807,22 @@ namespace olc
 		mapKeys[0x37] = Key::K7;
 		mapKeys[0x38] = Key::K8;
 		mapKeys[0x39] = Key::K9;
+
+		mapKeys[VK_NUMPAD0] = Key::NP0;
+		mapKeys[VK_NUMPAD1] = Key::NP1;
+		mapKeys[VK_NUMPAD2] = Key::NP2;
+		mapKeys[VK_NUMPAD3] = Key::NP3;
+		mapKeys[VK_NUMPAD4] = Key::NP4;
+		mapKeys[VK_NUMPAD5] = Key::NP5;
+		mapKeys[VK_NUMPAD6] = Key::NP6;
+		mapKeys[VK_NUMPAD7] = Key::NP7;
+		mapKeys[VK_NUMPAD8] = Key::NP8;
+		mapKeys[VK_NUMPAD9] = Key::NP9;
+		mapKeys[VK_MULTIPLY] = Key::NP_MUL;
+		mapKeys[VK_ADD] = Key::NP_ADD;
+		mapKeys[VK_DIVIDE] = Key::NP_DIV;
+		mapKeys[VK_SUBTRACT] = Key::NP_SUB;
+		mapKeys[VK_DECIMAL] = Key::NP_DECIMAL;
 
 		return olc_hWnd;
 	}

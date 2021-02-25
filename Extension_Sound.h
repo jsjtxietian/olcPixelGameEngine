@@ -9,6 +9,17 @@
 #include <istream>
 #include <algorithm>
 
+typedef struct
+{
+    unsigned short wFormatTag;
+    unsigned short nChannels;
+    unsigned long nSamplesPerSec;
+    unsigned long nAvgBytesPerSec;
+    unsigned short nBlockAlign;
+    unsigned short wBitsPerSample;
+    unsigned short cbSize;
+} OLC_WAVEFORMATEX;
+
 namespace olc
 {
     // Container class for Advanced 2D Drawing functions
@@ -24,7 +35,7 @@ namespace olc
             olc::rcode LoadFromFile(std::string sWavFile, olc::ResourcePack *pack = nullptr);
 
         public:
-            WAVEFORMATEX wavHeader;
+            OLC_WAVEFORMATEX wavHeader;
             float *fSample = nullptr;
             long nSamples = 0;
             int nChannels = 0;
@@ -57,7 +68,6 @@ namespace olc
 
     private:
         static void CALLBACK waveOutProc(HWAVEOUT hWaveOut, UINT uMsg, DWORD dwParam1, DWORD dwParam2);
-        static void AudioThread();
         static unsigned int m_nSampleRate;
         static unsigned int m_nChannels;
         static unsigned int m_nBlockCount;
@@ -66,11 +76,13 @@ namespace olc
         static short *m_pBlockMemory;
         static WAVEHDR *m_pWaveHeaders;
         static HWAVEOUT m_hwDevice;
-        static std::thread m_AudioThread;
-        static std::atomic<bool> m_bAudioThreadActive;
         static std::atomic<unsigned int> m_nBlockFree;
         static std::condition_variable m_cvBlockNotZero;
         static std::mutex m_muxBlockNotZero;
+
+        static void AudioThread();
+        static std::thread m_AudioThread;
+        static std::atomic<bool> m_bAudioThreadActive;
         static std::atomic<float> m_fGlobalTime;
         static std::function<float(int, float, float)> funcUserSynth;
         static std::function<float(int, float, float)> funcUserFilter;
