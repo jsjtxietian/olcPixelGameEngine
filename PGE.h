@@ -392,9 +392,9 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// Draws a single Pixel
 		virtual bool Draw(int32_t x, int32_t y, Pixel p = olc::WHITE);
 		// Draws a line from (x1,y1) to (x2,y2)
-		void DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p = olc::WHITE);
+		void DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p = olc::WHITE, uint32_t pattern = 0xFFFFFFFF);
 		// Draws a circle located at (x,y) with radius
-		void DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p = olc::WHITE);
+		void DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p = olc::WHITE, uint8_t mask = 0xFF);
 		// Fills a circle located at (x,y) with radius
 		void FillCircle(int32_t x, int32_t y, int32_t radius, Pixel p = olc::WHITE);
 		// Draws a rectangle at (x,y) to (x+w,y+h)
@@ -575,8 +575,6 @@ namespace olc
 			delete pColData;
 	}
 
-	// /NOTE! Currently on Windows olc::Sprites cannot be constructed in the constructor of any olc::PixelGameEngine derived class.
-	//The GDI Subsystem for loading PNG files needs to start before sprites can be loaded, so its important to only load sprites during or after OnUserCreate().
 	olc::rcode Sprite::LoadFromFile(std::string sImageFile, olc::ResourcePack *pack)
 	{
 		// Use GDI+
@@ -1024,11 +1022,16 @@ namespace olc
 		return false;
 	}
 
-	void PixelGameEngine::DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p)
+	void PixelGameEngine::DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p, uint32_t pattern)
 	{
 		int x, y, dx, dy, dx1, dy1, px, py, xe, ye, i;
 		dx = x2 - x1;
 		dy = y2 - y1;
+
+		auto rol = [&](void) {
+			pattern = (pattern << 1) | (pattern >> 31);
+			return pattern & 1;
+		};
 
 		// straight lines idea by gurkanctn
 		if (dx == 0) // Line is vertical
@@ -1036,7 +1039,8 @@ namespace olc
 			if (y2 < y1)
 				std::swap(y1, y2);
 			for (y = y1; y <= y2; y++)
-				Draw(x1, y, p);
+				if (rol())
+					Draw(x, y, p);
 			return;
 		}
 
@@ -1045,7 +1049,8 @@ namespace olc
 			if (x2 < x1)
 				std::swap(x1, x2);
 			for (x = x1; x <= x2; x++)
-				Draw(x, y1, p);
+				if (rol())
+					Draw(x, y, p);
 			return;
 		}
 
@@ -1069,7 +1074,8 @@ namespace olc
 				xe = x1;
 			}
 
-			Draw(x, y, p);
+			if (rol())
+				Draw(x, y, p);
 
 			for (i = 0; x < xe; i++)
 			{
@@ -1084,7 +1090,8 @@ namespace olc
 						y = y - 1;
 					px = px + 2 * (dy1 - dx1);
 				}
-				Draw(x, y, p);
+				if (rol())
+					Draw(x, y, p);
 			}
 		}
 		else
@@ -1102,7 +1109,8 @@ namespace olc
 				ye = y1;
 			}
 
-			Draw(x, y, p);
+			if (rol())
+				Draw(x, y, p);
 
 			for (i = 0; y < ye; i++)
 			{
@@ -1117,12 +1125,13 @@ namespace olc
 						x = x - 1;
 					py = py + 2 * (dx1 - dy1);
 				}
-				Draw(x, y, p);
+				if (rol())
+					Draw(x, y, p);
 			}
 		}
 	}
 
-	void PixelGameEngine::DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p)
+	void PixelGameEngine::DrawCircle(int32_t x, int32_t y, int32_t radius, Pixel p, uint8_t mask)
 	{
 		int x0 = 0;
 		int y0 = radius;
@@ -1132,14 +1141,22 @@ namespace olc
 
 		while (y0 >= x0) // only formulate 1/8 of circle
 		{
-			Draw(x - x0, y - y0, p); //upper left left
-			Draw(x - y0, y - x0, p); //upper upper left
-			Draw(x + y0, y - x0, p); //upper upper right
-			Draw(x + x0, y - y0, p); //upper right right
-			Draw(x - x0, y + y0, p); //lower left left
-			Draw(x - y0, y + x0, p); //lower lower left
-			Draw(x + y0, y + x0, p); //lower lower right
-			Draw(x + x0, y + y0, p); //lower right right
+			if (mask & 0x01)
+				Draw(x + x0, y - y0, p);
+			if (mask & 0x02)
+				Draw(x + y0, y - x0, p);
+			if (mask & 0x04)
+				Draw(x + y0, y + x0, p);
+			if (mask & 0x08)
+				Draw(x + x0, y + y0, p);
+			if (mask & 0x10)
+				Draw(x - x0, y + y0, p);
+			if (mask & 0x20)
+				Draw(x - y0, y + x0, p);
+			if (mask & 0x40)
+				Draw(x - y0, y - x0, p);
+			if (mask & 0x80)
+				Draw(x - x0, y - y0, p);
 			if (d < 0)
 				d += 4 * x0++ + 6;
 			else
