@@ -39,6 +39,7 @@ static wglSwapInterval_t *wglSwapInterval;
 
 #undef min
 #undef max
+#define UNUSED(x) (void)(x)
 
 namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 {
@@ -141,6 +142,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 			return *this;
 		}
 		inline T &operator[](std::size_t i) { return *((T *)this + i); /* <-- D'oh :( */ }
+		inline operator v2d_generic<int>() const { return {static_cast<int32_t>(this->x), static_cast<int32_t>(this->y)}; }
+		inline operator v2d_generic<float>() const { return {static_cast<float>(this->x), static_cast<float>(this->y)}; }
 	};
 
 	template <class T>
@@ -178,8 +181,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		~ResourcePack();
 		struct sEntry : public std::streambuf
 		{
-			uint32_t nID, nFileOffset, nFileSize;
-			uint8_t *data;
+			uint32_t nID = 0, nFileOffset = 0, nFileSize = 0;
+			uint8_t *data = nullptr;
 			void _config() { this->setg((char *)data, (char *)data, (char *)(data + nFileSize)); }
 		};
 
@@ -598,9 +601,9 @@ namespace olc
 
 	olc::rcode Sprite::LoadFromFile(std::string sImageFile, olc::ResourcePack *pack)
 	{
+		UNUSED(pack);
 		// Use GDI+
-		std::wstring wsImageFile;
-		wsImageFile = ConvertS2W(sImageFile);
+		std::wstring wsImageFile = ConvertS2W(sImageFile);
 		Gdiplus::Bitmap *bmp = Gdiplus::Bitmap::FromFile(wsImageFile.c_str());
 		if (bmp == nullptr)
 			return olc::NO_FILE;
@@ -1646,6 +1649,7 @@ namespace olc
 	}
 	bool PixelGameEngine::OnUserUpdate(float fElapsedTime)
 	{
+		UNUSED(fElapsedTime);
 		return false;
 	}
 	bool PixelGameEngine::OnUserDestroy()
@@ -1690,12 +1694,9 @@ namespace olc
 		// Mouse coords come in screen space
 		// But leave in pixel space
 
-		if (bFullScreen)
-		{
-			// Full Screen mode may have a weird viewport we must clamp to
-			x -= nViewX;
-			y -= nViewY;
-		}
+		// Full Screen mode may have a weird viewport we must clamp to
+		x -= nViewX;
+		y -= nViewY;
 
 		nMousePosXcache = (int32_t)(((float)x / (float)(nWindowWidth - (nViewX * 2)) * (float)nScreenWidth));
 		nMousePosYcache = (int32_t)(((float)y / (float)(nWindowHeight - (nViewY * 2)) * (float)nScreenHeight));
