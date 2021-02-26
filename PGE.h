@@ -66,6 +66,9 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 			ALPHA,
 			CUSTOM
 		};
+
+		bool operator==(const Pixel &p) const;
+		bool operator!=(const Pixel &p) const;
 	};
 
 	// Some constants for symbolic naming of Pixels
@@ -100,6 +103,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		inline v2d_generic(T _x, T _y) : x(_x), y(_y) {}
 		inline v2d_generic(const v2d_generic &v) : x(v.x), y(v.y) {}
 		inline T mag() { return sqrt(x * x + y * y); }
+		inline T mag2() { return x * x + y * y; }
 		inline v2d_generic norm()
 		{
 			T r = 1 / mag();
@@ -335,7 +339,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		PixelGameEngine();
 
 	public:
-		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen = false);
+		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen = false, bool vsync = false);
 		olc::rcode Start();
 
 	public: // Override Interfaces
@@ -414,6 +418,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		void DrawString(int32_t x, int32_t y, std::string sText, Pixel col = olc::WHITE, uint32_t scale = 1);
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
+		// Resize the primary screen sprite
+		void SetScreenSize(int w, int h);
 
 	public: // Branding
 		std::string sAppName;
@@ -446,13 +452,14 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		float fSubPixelOffsetY = 0.0f;
 		bool bHasInputFocus = false;
 		bool bHasMouseFocus = false;
+		bool bEnableVSYNC = false;
 		float fFrameTimer = 1.0f;
 		int nFrameCount = 0;
 		float fFramePeriod = 0.0f;
 		Sprite *fontSprite = nullptr;
 
 		std::function<olc::Pixel(const int x, const int y, const olc::Pixel &, const olc::Pixel &)> funcPixelMode;
-		static std::map<uint16_t, uint8_t> mapKeys;
+		static std::map<size_t, uint8_t> mapKeys;
 		bool pKeyNewState[256]{0};
 		bool pKeyOldState[256]{0};
 		HWButton pKeyboardState[256];
@@ -527,6 +534,16 @@ namespace olc
 	Pixel::Pixel(uint32_t p)
 	{
 		n = p;
+	}
+
+	bool Pixel::operator==(const Pixel &p) const
+	{
+		return n == p.n;
+	}
+
+	bool Pixel::operator!=(const Pixel &p) const
+	{
+		return n != p.n;
 	}
 
 	//End pixel
@@ -815,15 +832,15 @@ namespace olc
 			return olc::FAIL;
 
 		// 1) Read Map
-		size_t nMapEntries;
-		ifs.read((char *)&nMapEntries, sizeof(size_t));
-		for (size_t i = 0; i < nMapEntries; i++)
+		uint32_t nMapEntries;
+		ifs.read((char *)&nMapEntries, sizeof(uint32_t));
+		for (uint32_t i = 0; i < nMapEntries; i++)
 		{
-			size_t nFilePathSize = 0;
-			ifs.read((char *)&nFilePathSize, sizeof(size_t));
+			uint32_t nFilePathSize = 0;
+			ifs.read((char *)&nFilePathSize, sizeof(uint32_t));
 
 			std::string sFileName(nFilePathSize, ' ');
-			for (size_t j = 0; j < nFilePathSize; j++)
+			for (uint32_t j = 0; j < nFilePathSize; j++)
 				sFileName[j] = ifs.get();
 
 			sEntry e;
@@ -875,7 +892,7 @@ namespace olc
 		olc::PGEX::pge = this;
 	}
 
-	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen)
+	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen, bool vsync)
 	{
 		nScreenWidth = screen_w;
 		nScreenHeight = screen_h;
@@ -884,6 +901,7 @@ namespace olc
 		fPixelX = 2.0f / (float)(nScreenWidth);
 		fPixelY = 2.0f / (float)(nScreenHeight);
 		bFullScreen = full_screen;
+		bEnableVSYNC = vsync;
 
 		if (nPixelWidth == 0 || nPixelHeight == 0 || nScreenWidth == 0 || nScreenHeight == 0)
 			return olc::FAIL;
@@ -898,6 +916,19 @@ namespace olc
 		pDefaultDrawTarget = new Sprite(nScreenWidth, nScreenHeight);
 		SetDrawTarget(nullptr);
 		return olc::OK;
+	}
+
+	void PixelGameEngine::SetScreenSize(int w, int h)
+	{
+		delete pDefaultDrawTarget;
+		nScreenWidth = w;
+		nScreenHeight = h;
+		pDefaultDrawTarget = new Sprite(nScreenWidth, nScreenHeight);
+		SetDrawTarget(nullptr);
+		glClear(GL_COLOR_BUFFER_BIT);
+		SwapBuffers(glDeviceContext);
+		glClear(GL_COLOR_BUFFER_BIT);
+		olc_UpdateViewport();
 	}
 
 	olc::rcode PixelGameEngine::Start()
@@ -1910,7 +1941,7 @@ namespace olc
 
 		// Define window furniture
 		DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-		DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE; // | WS_THICKFRAME;
+		DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME;
 
 		int nCosmeticOffset = 30;
 		nViewW = nWindowWidth;
@@ -2065,7 +2096,7 @@ namespace olc
 
 		// Remove Frame cap
 		wglSwapInterval = (wglSwapInterval_t *)wglGetProcAddress("wglSwapIntervalEXT");
-		if (wglSwapInterval)
+		if (wglSwapInterval && !bEnableVSYNC)
 			wglSwapInterval(0);
 		return true;
 	}
@@ -2143,7 +2174,7 @@ namespace olc
 	// Need a couple of statics as these are singleton instances
 	// read from multiple locations
 	std::atomic<bool> PixelGameEngine::bAtomActive{false};
-	std::map<uint16_t, uint8_t> PixelGameEngine::mapKeys;
+	std::map<size_t, uint8_t> PixelGameEngine::mapKeys;
 	olc::PixelGameEngine *olc::PGEX::pge = nullptr;
 
 #ifdef OLC_DBG_OVERDRAW
