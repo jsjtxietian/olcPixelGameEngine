@@ -2,7 +2,7 @@
 // Include the olcPixelGameEngine
 #include "PGE.h"
 
-// To use an extension, just include it
+#define OLC_PGE_GRAPHICS2D
 #include "Extension_Graphics2D.h"
 
 class TestExtension : public olc::PixelGameEngine
@@ -38,8 +38,8 @@ public:
 		DrawCircle(32, 32, 30); // Circle
 		DrawCircle(96, 32, 30); // Circle
 
-		float mx = GetMouseX();
-		float my = GetMouseY();
+		float mx = (float)GetMouseX();
+		float my = (float)GetMouseY();
 
 		float px1 = mx - 32, px2 = mx - 96;
 		float py1 = my - 32, py2 = my - 32;
@@ -49,8 +49,8 @@ public:
 		py1 = 22.0f * (py1 * pr1) + 32.0f;
 		px2 = 22.0f * (px2 * pr2) + 96.0f;
 		py2 = 22.0f * (py2 * pr2) + 32.0f;
-		FillCircle(px1, py1, 8, olc::CYAN);
-		FillCircle(px2, py2, 8, olc::CYAN);
+		FillCircle((int32_t)px1, (int32_t)py1, 8, olc::CYAN);
+		FillCircle((int32_t)px2, (int32_t)py2, 8, olc::CYAN);
 
 		DrawLine(10, 70, 54, 70); // Lines
 		DrawLine(54, 70, 70, 54);
@@ -119,6 +119,8 @@ public:
 
 		// Use extension to draw sprite with transform applied
 		olc::GFX2D::DrawSprite(spr, t1);
+
+		DrawSprite((int32_t)mx, (int32_t)my, spr, 1);
 
 		return true;
 	}
