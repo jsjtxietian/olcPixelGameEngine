@@ -5,6 +5,8 @@
 
 #define OLC_PGE_APPLICATION
 #include "PGE.h"
+
+#define OLC_PGEX_SOUND
 #include "Extension_Sound.h"
 
 #include <list>
@@ -63,7 +65,7 @@ private:
 
     bool OnUserCreate()
     {
-        olc::SOUND::InitialiseAudio();
+        olc::SOUND::InitialiseAudio(44100, 1, 8, 512);
         sndSampleA = olc::SOUND::LoadAudioSample("./Assets/SampleA.wav");
         sndSampleB = olc::SOUND::LoadAudioSample("./Assets/SampleB.wav");
         sndSampleC = olc::SOUND::LoadAudioSample("./Assets/SampleC.wav");
