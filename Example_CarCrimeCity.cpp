@@ -17,6 +17,8 @@
 	Relevant Video: https://youtu.be/mD6b_hP17WI
 */
 
+//Part2 still not included
+
 #define OLC_PGE_APPLICATION
 #include "PGE.h"
 #include "Extension_Graphics3D.h"

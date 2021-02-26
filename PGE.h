@@ -108,10 +108,10 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		inline v2d_generic perp() { return v2d_generic(-y, x); }
 		inline T dot(const v2d_generic &rhs) { return this->x * rhs.x + this->y * rhs.y; }
 		inline T cross(const v2d_generic &rhs) { return this->x * rhs.y - this->y * rhs.x; }
-		inline v2d_generic operator+(const v2d_generic &rhs) { return v2d_generic(this->x + rhs.x, this->y + rhs.y); }
-		inline v2d_generic operator-(const v2d_generic &rhs) { return v2d_generic(this->x - rhs.x, this->y - rhs.y); }
-		inline v2d_generic operator*(const T &rhs) { return v2d_generic(this->x * rhs, this->y * rhs); }
-		inline v2d_generic operator/(const T &rhs) { return v2d_generic(this->x / rhs, this->y / rhs); }
+		inline v2d_generic operator+(const v2d_generic &rhs) const { return v2d_generic(this->x + rhs.x, this->y + rhs.y); }
+		inline v2d_generic operator-(const v2d_generic &rhs) const { return v2d_generic(this->x - rhs.x, this->y - rhs.y); }
+		inline v2d_generic operator*(const T &rhs) const { return v2d_generic(this->x * rhs, this->y * rhs); }
+		inline v2d_generic operator/(const T &rhs) const { return v2d_generic(this->x / rhs, this->y / rhs); }
 		inline v2d_generic &operator+=(const v2d_generic &rhs)
 		{
 			this->x += rhs.x;
@@ -335,7 +335,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		PixelGameEngine();
 
 	public:
-		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h);
+		olc::rcode Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen = false);
 		olc::rcode Start();
 
 	public: // Override Interfaces
@@ -415,8 +415,6 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
 
-		void EnableFullScreen(bool bFullScreen, bool bMaintainAspect = true);
-
 	public: // Branding
 		std::string sAppName;
 
@@ -437,6 +435,11 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		int32_t nMouseWheelDeltaCache = 0;
 		int32_t nWindowWidth = 0;
 		int32_t nWindowHeight = 0;
+		int32_t nViewX = 0;
+		int32_t nViewY = 0;
+		int32_t nViewW = 0;
+		int32_t nViewH = 0;
+		bool bFullScreen = false;
 		float fPixelX = 1.0f;
 		float fPixelY = 1.0f;
 		float fSubPixelOffsetX = 0.0f;
@@ -473,6 +476,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		void olc_UpdateMouse(int32_t x, int32_t y);
 		void olc_UpdateMouseWheel(int32_t delta);
 		void olc_UpdateWindowSize(int32_t x, int32_t y);
+		void olc_UpdateViewport();
 		bool olc_OpenGLCreate();
 		void olc_ConstructFontSheet();
 
@@ -871,7 +875,7 @@ namespace olc
 		olc::PGEX::pge = this;
 	}
 
-	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h)
+	olc::rcode PixelGameEngine::Construct(uint32_t screen_w, uint32_t screen_h, uint32_t pixel_w, uint32_t pixel_h, bool full_screen)
 	{
 		nScreenWidth = screen_w;
 		nScreenHeight = screen_h;
@@ -879,6 +883,7 @@ namespace olc
 		nPixelHeight = pixel_h;
 		fPixelX = 2.0f / (float)(nScreenWidth);
 		fPixelY = 2.0f / (float)(nScreenHeight);
+		bFullScreen = full_screen;
 
 		if (nPixelWidth == 0 || nPixelHeight == 0 || nScreenWidth == 0 || nScreenHeight == 0)
 			return olc::FAIL;
@@ -1618,22 +1623,30 @@ namespace olc
 	}
 	//////////////////////////////////////////////////////////////////
 
-	void PixelGameEngine::EnableFullScreen(bool bFullScreen, bool bMaintainAspect)
+	void PixelGameEngine::olc_UpdateViewport()
 	{
-		if (bFullScreen)
+		int32_t ww = nScreenWidth * nPixelWidth;
+		int32_t wh = nScreenHeight * nPixelHeight;
+		float wasp = (float)ww / (float)wh;
+
+		nViewW = (int32_t)nWindowWidth;
+		nViewH = (int32_t)((float)nViewW / wasp);
+
+		if (nViewH > nWindowHeight)
 		{
-			// Go full Screen
+			nViewH = nWindowHeight;
+			nViewW = (int32_t)((float)nViewH * wasp);
 		}
-		else
-		{
-			// Go back to window
-		}
+
+		nViewX = (nWindowWidth - nViewW) / 2;
+		nViewY = (nWindowHeight - nViewH) / 2;
 	}
 
 	void PixelGameEngine::olc_UpdateWindowSize(int32_t x, int32_t y)
 	{
 		nWindowWidth = x;
 		nWindowHeight = y;
+		olc_UpdateViewport();
 	}
 
 	void PixelGameEngine::olc_UpdateMouseWheel(int32_t delta)
@@ -1645,8 +1658,16 @@ namespace olc
 	{
 		// Mouse coords come in screen space
 		// But leave in pixel space
-		nMousePosXcache = (int32_t)(((float)x / (float)nWindowWidth) * (float)nScreenWidth);
-		nMousePosYcache = (int32_t)(((float)y / (float)nWindowHeight) * (float)nScreenHeight);
+
+		if (bFullScreen)
+		{
+			// Full Screen mode may have a weird viewport we must clamp to
+			x -= nViewX;
+			y -= nViewY;
+		}
+
+		nMousePosXcache = (int32_t)(((float)x / (float)(nWindowWidth - (nViewX * 2)) * (float)nScreenWidth));
+		nMousePosYcache = (int32_t)(((float)y / (float)(nWindowHeight - (nViewY * 2)) * (float)nScreenHeight));
 
 		if (nMousePosXcache >= (int32_t)nScreenWidth)
 			nMousePosXcache = nScreenWidth - 1;
@@ -1756,6 +1777,7 @@ namespace olc
 					bAtomActive = false;
 
 				// Display Graphics
+				glViewport(nViewX, nViewY, nViewW, nViewH);
 
 				// Copy pixel array into texture
 				// https://stackoverflow.com/questions/2405734/difference-between-gltexsubimage-and-glteximage-function-in-opengl?answertab=oldest#tab-top
@@ -1883,13 +1905,35 @@ namespace olc
 #endif
 
 		RegisterClass(&wc);
+		nWindowWidth = (LONG)nScreenWidth * (LONG)nPixelWidth;
+		nWindowHeight = (LONG)nScreenHeight * (LONG)nPixelHeight;
 
 		// Define window furniture
 		DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-		DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE;
-		RECT rWndRect = {0, 0, (LONG)nScreenWidth * (LONG)nPixelWidth, (LONG)nScreenHeight * (LONG)nPixelHeight};
+		DWORD dwStyle = WS_CAPTION | WS_SYSMENU | WS_VISIBLE; // | WS_THICKFRAME;
+
+		int nCosmeticOffset = 30;
+		nViewW = nWindowWidth;
+		nViewH = nWindowHeight;
+
+		// Handle Fullscreen
+		if (bFullScreen)
+		{
+			dwExStyle = 0;
+			dwStyle = WS_VISIBLE | WS_POPUP;
+			nCosmeticOffset = 0;
+			HMONITOR hmon = MonitorFromWindow(olc_hWnd, MONITOR_DEFAULTTONEAREST);
+			MONITORINFO mi = {sizeof(mi)};
+			if (!GetMonitorInfo(hmon, &mi))
+				return NULL;
+			nWindowWidth = mi.rcMonitor.right;
+			nWindowHeight = mi.rcMonitor.bottom;
+		}
+
+		olc_UpdateViewport();
 
 		// Keep client size as requested
+		RECT rWndRect = {0, 0, nWindowWidth, nWindowHeight};
 		AdjustWindowRectEx(&rWndRect, dwStyle, FALSE, dwExStyle);
 
 		int width = rWndRect.right - rWndRect.left;
@@ -1897,10 +1941,10 @@ namespace olc
 
 #ifdef UNICODE
 		olc_hWnd = CreateWindowEx(dwExStyle, L"OLC_PIXEL_GAME_ENGINE", L"", dwStyle,
-								  30, 30, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
+								  nCosmeticOffset, nCosmeticOffset, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
 #else
 		olc_hWnd = CreateWindowEx(dwExStyle, "OLC_PIXEL_GAME_ENGINE", "", dwStyle,
-								  30, 30, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
+								  nCosmeticOffset, nCosmeticOffset, width, height, NULL, NULL, GetModuleHandle(nullptr), this);
 #endif
 
 		// Create Keyboard Mapping
@@ -2016,6 +2060,8 @@ namespace olc
 		if (!(glRenderContext = wglCreateContext(glDeviceContext)))
 			return false;
 		wglMakeCurrent(glDeviceContext, glRenderContext);
+
+		glViewport(nViewX, nViewY, nViewW, nViewH);
 
 		// Remove Frame cap
 		wglSwapInterval = (wglSwapInterval_t *)wglGetProcAddress("wglSwapIntervalEXT");
