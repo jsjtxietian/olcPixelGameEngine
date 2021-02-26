@@ -35,6 +35,7 @@ static wglSwapInterval_t *wglSwapInterval;
 #include <codecvt>
 #include <functional>
 #include <streambuf>
+#include <algorithm>
 
 #undef min
 #undef max
@@ -87,13 +88,81 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		NO_FILE = -1,
 	};
 
+	//==================================================================================
+
+	template <class T>
+	struct v2d_generic
+	{
+		T x = 0;
+		T y = 0;
+
+		inline v2d_generic() : x(0), y(0) {}
+		inline v2d_generic(T _x, T _y) : x(_x), y(_y) {}
+		inline v2d_generic(const v2d_generic &v) : x(v.x), y(v.y) {}
+		inline T mag() { return sqrt(x * x + y * y); }
+		inline v2d_generic norm()
+		{
+			T r = 1 / mag();
+			return v2d_generic(x * r, y * r);
+		}
+		inline v2d_generic perp() { return v2d_generic(-y, x); }
+		inline T dot(const v2d_generic &rhs) { return this->x * rhs.x + this->y * rhs.y; }
+		inline T cross(const v2d_generic &rhs) { return this->x * rhs.y - this->y * rhs.x; }
+		inline v2d_generic operator+(const v2d_generic &rhs) { return v2d_generic(this->x + rhs.x, this->y + rhs.y); }
+		inline v2d_generic operator-(const v2d_generic &rhs) { return v2d_generic(this->x - rhs.x, this->y - rhs.y); }
+		inline v2d_generic operator*(const T &rhs) { return v2d_generic(this->x * rhs, this->y * rhs); }
+		inline v2d_generic operator/(const T &rhs) { return v2d_generic(this->x / rhs, this->y / rhs); }
+		inline v2d_generic &operator+=(const v2d_generic &rhs)
+		{
+			this->x += rhs.x;
+			this->y += rhs.y;
+			return *this;
+		}
+		inline v2d_generic &operator-=(const v2d_generic &rhs)
+		{
+			this->x -= rhs.x;
+			this->y -= rhs.y;
+			return *this;
+		}
+		inline v2d_generic &operator*=(const T &rhs)
+		{
+			this->x *= rhs;
+			this->y *= rhs;
+			return *this;
+		}
+		inline v2d_generic &operator/=(const T &rhs)
+		{
+			this->x /= rhs;
+			this->y /= rhs;
+			return *this;
+		}
+		inline T &operator[](std::size_t i) { return *((T *)this + i); /* <-- D'oh :( */ }
+	};
+
+	template <class T>
+	inline v2d_generic<T> operator*(const float &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs * rhs.x, lhs * rhs.y); }
+	template <class T>
+	inline v2d_generic<T> operator*(const double &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs * rhs.x, lhs * rhs.y); }
+	template <class T>
+	inline v2d_generic<T> operator*(const int &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs * rhs.x, lhs * rhs.y); }
+	template <class T>
+	inline v2d_generic<T> operator/(const float &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs / rhs.x, lhs / rhs.y); }
+	template <class T>
+	inline v2d_generic<T> operator/(const double &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs / rhs.x, lhs / rhs.y); }
+	template <class T>
+	inline v2d_generic<T> operator/(const int &lhs, const v2d_generic<T> &rhs) { return v2d_generic<T>(lhs / rhs.x, lhs / rhs.y); }
+
+	typedef v2d_generic<int> vi2d;
+	typedef v2d_generic<float> vf2d;
+	typedef v2d_generic<double> vd2d;
+
 	//=============================================================
 
 	struct HWButton
 	{
 		bool bPressed = false;	// Set once during the frame the event occurs
 		bool bReleased = false; // Set once during the frame the event occurs
-		bool bHeld = false;		// Set tru for all frames between pressed and released events
+		bool bHeld = false;		// Set true for all frames between pressed and released events
 	};
 
 	//=============================================================
@@ -154,8 +223,9 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 	public:
 		void SetSampleMode(olc::Sprite::Mode mode = olc::Sprite::Mode::NORMAL);
 		Pixel GetPixel(int32_t x, int32_t y);
-		void SetPixel(int32_t x, int32_t y, Pixel p);
+		bool SetPixel(int32_t x, int32_t y, Pixel p);
 		Pixel Sample(float x, float y);
+		Pixel SampleBL(float u, float v);
 		Pixel *GetData();
 
 	private:
@@ -172,6 +242,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 
 	enum Key
 	{
+		NONE,
 		A,
 		B,
 		C,
@@ -286,6 +357,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		int32_t GetMouseX();
 		// Get Mouse Y coordinate in "pixel" space
 		int32_t GetMouseY();
+		// Get Mouse Wheel Delta
+		int32_t GetMouseWheel();
 
 	public: // Utility
 		// Returns the width of the screen in "pixels"
@@ -317,7 +390,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		void SetSubPixelOffset(float ox, float oy);
 
 		// Draws a single Pixel
-		virtual void Draw(int32_t x, int32_t y, Pixel p = olc::WHITE);
+		virtual bool Draw(int32_t x, int32_t y, Pixel p = olc::WHITE);
 		// Draws a line from (x1,y1) to (x2,y2)
 		void DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p = olc::WHITE);
 		// Draws a circle located at (x,y) with radius
@@ -342,6 +415,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
 
+		void EnableFullScreen(bool bFullScreen, bool bMaintainAspect = true);
+
 	public: // Branding
 		std::string sAppName;
 
@@ -356,6 +431,12 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		uint32_t nPixelHeight = 4;
 		int32_t nMousePosX = 0;
 		int32_t nMousePosY = 0;
+		int32_t nMouseWheelDelta = 0;
+		int32_t nMousePosXcache = 0;
+		int32_t nMousePosYcache = 0;
+		int32_t nMouseWheelDeltaCache = 0;
+		int32_t nWindowWidth = 0;
+		int32_t nWindowHeight = 0;
 		float fPixelX = 1.0f;
 		float fPixelY = 1.0f;
 		float fSubPixelOffsetX = 0.0f;
@@ -390,6 +471,8 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 
 		// Common initialisation functions
 		void olc_UpdateMouse(int32_t x, int32_t y);
+		void olc_UpdateMouseWheel(int32_t delta);
+		void olc_UpdateWindowSize(int32_t x, int32_t y);
 		bool olc_OpenGLCreate();
 		void olc_ConstructFontSheet();
 
@@ -592,21 +675,48 @@ namespace olc
 		}
 	}
 
-	void Sprite::SetPixel(int32_t x, int32_t y, Pixel p)
+	bool Sprite::SetPixel(int32_t x, int32_t y, Pixel p)
 	{
 #ifdef OLC_DBG_OVERDRAW
 		nOverdrawCount++;
 #endif
 
 		if (x >= 0 && x < width && y >= 0 && y < height)
+		{
 			pColData[y * width + x] = p;
+			return true;
+		}
+		else
+			return false;
 	}
 
 	Pixel Sprite::Sample(float x, float y)
 	{
-		int32_t sx = (int32_t)(x * (float)width);
-		int32_t sy = (int32_t)(y * (float)height);
+		int32_t sx = std::min((int32_t)((x * (float)width)), width - 1);
+		int32_t sy = std::min((int32_t)((y * (float)height)), height - 1);
 		return GetPixel(sx, sy);
+	}
+
+	Pixel Sprite::SampleBL(float u, float v)
+	{
+		u = u * width - 0.5f;
+		v = v * height - 0.5f;
+		int x = (int)floor(u); // cast to int rounds toward zero, not downward
+		int y = (int)floor(v);
+		float u_ratio = u - x;
+		float v_ratio = v - y;
+		float u_opposite = 1 - u_ratio;
+		float v_opposite = 1 - v_ratio;
+
+		olc::Pixel p1 = GetPixel(std::max(x, 0), std::max(y, 0));
+		olc::Pixel p2 = GetPixel(std::min(x + 1, (int)width - 1), std::max(y, 0));
+		olc::Pixel p3 = GetPixel(std::max(x, 0), std::min(y + 1, (int)height - 1));
+		olc::Pixel p4 = GetPixel(std::min(x + 1, (int)width - 1), std::min(y + 1, (int)height - 1));
+
+		return olc::Pixel(
+			(uint8_t)((p1.r * u_opposite + p2.r * u_ratio) * v_opposite + (p3.r * u_opposite + p4.r * u_ratio) * v_ratio),
+			(uint8_t)((p1.g * u_opposite + p2.g * u_ratio) * v_opposite + (p3.g * u_opposite + p4.g * u_ratio) * v_ratio),
+			(uint8_t)((p1.b * u_opposite + p2.b * u_ratio) * v_opposite + (p3.b * u_opposite + p4.b * u_ratio) * v_ratio));
 	}
 
 	Pixel *Sprite::GetData() { return pColData; }
@@ -793,11 +903,6 @@ namespace olc
 		if (!olc_WindowCreate())
 			return olc::FAIL;
 
-		// Load libraries required for PNG file interaction
-		// Windows use GDI+
-		Gdiplus::GdiplusStartupInput startupInput;
-		ULONG_PTR token;
-		Gdiplus::GdiplusStartup(&token, &startupInput, NULL);
 		// Start the thread
 		bAtomActive = true;
 		std::thread t = std::thread(&PixelGameEngine::EngineThread, this);
@@ -869,6 +974,11 @@ namespace olc
 		return nMousePosY;
 	}
 
+	int32_t PixelGameEngine::GetMouseWheel()
+	{
+		return nMouseWheelDelta;
+	}
+
 	int32_t PixelGameEngine::ScreenWidth()
 	{
 		return nScreenWidth;
@@ -879,22 +989,20 @@ namespace olc
 		return nScreenHeight;
 	}
 
-	void PixelGameEngine::Draw(int32_t x, int32_t y, Pixel p)
+	bool PixelGameEngine::Draw(int32_t x, int32_t y, Pixel p)
 	{
 		if (!pDrawTarget)
-			return;
+			return false;
 
 		if (nPixelMode == Pixel::NORMAL)
 		{
-			pDrawTarget->SetPixel(x, y, p);
-			return;
+			return pDrawTarget->SetPixel(x, y, p);
 		}
 
 		if (nPixelMode == Pixel::MASK)
 		{
 			if (p.a == 255)
-				pDrawTarget->SetPixel(x, y, p);
-			return;
+				return pDrawTarget->SetPixel(x, y, p);
 		}
 
 		if (nPixelMode == Pixel::ALPHA)
@@ -905,15 +1013,15 @@ namespace olc
 			float r = a * (float)p.r + c * (float)d.r;
 			float g = a * (float)p.g + c * (float)d.g;
 			float b = a * (float)p.b + c * (float)d.b;
-			pDrawTarget->SetPixel(x, y, Pixel((uint8_t)r, (uint8_t)g, (uint8_t)b));
-			return;
+			return pDrawTarget->SetPixel(x, y, Pixel((uint8_t)r, (uint8_t)g, (uint8_t)b));
 		}
 
 		if (nPixelMode == Pixel::CUSTOM)
 		{
-			pDrawTarget->SetPixel(x, y, funcPixelMode(x, y, p, pDrawTarget->GetPixel(x, y)));
-			return;
+			return pDrawTarget->SetPixel(x, y, funcPixelMode(x, y, p, pDrawTarget->GetPixel(x, y)));
 		}
+
+		return false;
 	}
 
 	void PixelGameEngine::DrawLine(int32_t x1, int32_t y1, int32_t x2, int32_t y2, Pixel p)
@@ -1493,22 +1601,45 @@ namespace olc
 	}
 	//////////////////////////////////////////////////////////////////
 
+	void PixelGameEngine::EnableFullScreen(bool bFullScreen, bool bMaintainAspect)
+	{
+		if (bFullScreen)
+		{
+			// Go full Screen
+		}
+		else
+		{
+			// Go back to window
+		}
+	}
+
+	void PixelGameEngine::olc_UpdateWindowSize(int32_t x, int32_t y)
+	{
+		nWindowWidth = x;
+		nWindowHeight = y;
+	}
+
+	void PixelGameEngine::olc_UpdateMouseWheel(int32_t delta)
+	{
+		nMouseWheelDeltaCache += delta;
+	}
+
 	void PixelGameEngine::olc_UpdateMouse(int32_t x, int32_t y)
 	{
 		// Mouse coords come in screen space
 		// But leave in pixel space
-		nMousePosX = x / (int32_t)nPixelWidth;
-		nMousePosY = y / (int32_t)nPixelHeight;
+		nMousePosXcache = (int32_t)(((float)x / (float)nWindowWidth) * (float)nScreenWidth);
+		nMousePosYcache = (int32_t)(((float)y / (float)nWindowHeight) * (float)nScreenHeight);
 
-		if (nMousePosX >= (int32_t)nScreenWidth)
-			nMousePosX = nScreenWidth - 1;
-		if (nMousePosY >= (int32_t)nScreenHeight)
-			nMousePosY = nScreenHeight - 1;
+		if (nMousePosXcache >= (int32_t)nScreenWidth)
+			nMousePosXcache = nScreenWidth - 1;
+		if (nMousePosYcache >= (int32_t)nScreenHeight)
+			nMousePosYcache = nScreenHeight - 1;
 
-		if (nMousePosX < 0)
-			nMousePosX = 0;
-		if (nMousePosY < 0)
-			nMousePosY = 0;
+		if (nMousePosXcache < 0)
+			nMousePosXcache = 0;
+		if (nMousePosYcache < 0)
+			nMousePosYcache = 0;
 	}
 
 	void PixelGameEngine::EngineThread()
@@ -1591,6 +1722,14 @@ namespace olc
 					pMouseOldState[i] = pMouseNewState[i];
 				}
 
+				// Cache mouse coordinates so they remain
+				// consistent during frame
+				nMousePosX = nMousePosXcache;
+				nMousePosY = nMousePosYcache;
+
+				nMouseWheelDelta = nMouseWheelDeltaCache;
+				nMouseWheelDeltaCache = 0;
+
 #ifdef OLC_DBG_OVERDRAW
 				olc::Sprite::nOverdrawCount = 0;
 #endif
@@ -1651,6 +1790,19 @@ namespace olc
 		wglDeleteContext(glRenderContext);
 		PostMessage(olc_hWnd, WM_DESTROY, 0, 0);
 	}
+
+	// allows sprites to be defined
+	// at construction, by initialising the GDI subsystem
+	static class GDIPlusStartup
+	{
+	public:
+		GDIPlusStartup()
+		{
+			Gdiplus::GdiplusStartupInput startupInput;
+			ULONG_PTR token;
+			Gdiplus::GdiplusStartup(&token, &startupInput, NULL);
+		};
+	} gdistartup;
 
 	void PixelGameEngine::olc_ConstructFontSheet()
 	{
@@ -1735,6 +1887,7 @@ namespace olc
 #endif
 
 		// Create Keyboard Mapping
+		mapKeys[0x00] = Key::NONE;
 		mapKeys[0x41] = Key::A;
 		mapKeys[0x42] = Key::B;
 		mapKeys[0x43] = Key::C;
@@ -1849,7 +2002,8 @@ namespace olc
 
 		// Remove Frame cap
 		wglSwapInterval = (wglSwapInterval_t *)wglGetProcAddress("wglSwapIntervalEXT");
-		wglSwapInterval(0);
+		if (wglSwapInterval)
+			wglSwapInterval(0);
 		return true;
 	}
 
@@ -1869,6 +2023,16 @@ namespace olc
 			int16_t ix = *(int16_t *)&x;
 			int16_t iy = *(int16_t *)&y;
 			sge->olc_UpdateMouse(ix, iy);
+			return 0;
+		}
+		case WM_SIZE:
+		{
+			sge->olc_UpdateWindowSize(lParam & 0xFFFF, (lParam >> 16) & 0xFFFF);
+			return 0;
+		}
+		case WM_MOUSEWHEEL:
+		{
+			sge->olc_UpdateMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
 			return 0;
 		}
 		case WM_MOUSELEAVE:
