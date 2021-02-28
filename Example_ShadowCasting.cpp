@@ -20,10 +20,12 @@
 
 #include <iostream>
 #include <algorithm>
-using namespace std;
 
 #define OLC_PGE_APPLICATION
 #include "PGE.h"
+
+using namespace std;
+
 
 struct sEdge
 {

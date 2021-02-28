@@ -59,6 +59,10 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "functional": "cpp",
-        "xhash": "cpp"
+        "xhash": "cpp",
+        "filesystem": "cpp",
+        "iomanip": "cpp",
+        "sstream": "cpp",
+        "unordered_map": "cpp"
     }
 }
