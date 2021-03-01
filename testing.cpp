@@ -20,17 +20,10 @@ public:
 	bool OnUserUpdate(float fElapsedTime) override
 	{
 		// called once per frame
-		// for (int x = 0; x < ScreenWidth(); x++)
-		// 	for (int y = 0; y < ScreenHeight(); y++)
-		// 		Draw(x, y, olc::Pixel(255, 128, 0));
-		olc::Sprite *sprite = new olc::Sprite("./Assets/logo_long.png");
-		sprite->SaveToPGESprFile("./Temp/TEST.dat");
-		delete sprite;
-
-		olc::Sprite *ssprite = new olc::Sprite("./Temp/Test.dat",nullptr);
-
-		DrawSprite(0, 0, ssprite);
-
+		for (int x = 0; x < ScreenWidth(); x++)
+			for (int y = 0; y < ScreenHeight(); y++)
+				Draw(x, y, olc::Pixel(255, 128, 0));
+		
 		return true;
 	}
 };

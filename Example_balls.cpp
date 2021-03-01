@@ -10,10 +10,12 @@ Part #2 https://youtu.be/ebq7L2Wtbl4
 #include <iostream>
 #include <string>
 #include <algorithm>
-using namespace std;
 
 #define OLC_PGE_APPLICATION
 #include "PGE.h"
+
+using namespace std;
+
 
 struct sBall
 {
