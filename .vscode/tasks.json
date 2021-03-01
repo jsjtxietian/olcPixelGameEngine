@@ -5,6 +5,7 @@
             "label": "Build",
             "type": "shell",
             "command": "${workspaceFolder}/build.bat",
+            "args": ["${fileBasename}"],
             "group": {
                 "kind": "build",
                 "isDefault": true
