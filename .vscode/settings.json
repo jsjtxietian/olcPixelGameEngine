@@ -64,6 +64,8 @@
         "iomanip": "cpp",
         "sstream": "cpp",
         "unordered_map": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "array": "cpp",
+        "unordered_set": "cpp"
     }
 }

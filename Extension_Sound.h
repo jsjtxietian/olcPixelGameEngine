@@ -9,7 +9,37 @@
 #include <istream>
 #include <cstring>
 #include <climits>
+#include <condition_variable>
 #include <algorithm>
+#undef min
+#undef max
+
+// Choose a default sound backend
+#if !defined(USE_ALSA) && !defined(USE_OPENAL) && !defined(USE_WINDOWS)
+#ifdef __linux__
+#define USE_ALSA
+#endif
+
+#ifdef __EMSCRIPTEN__
+#define USE_OPENAL
+#endif
+
+#ifdef _WIN32
+#define USE_WINDOWS
+#endif
+
+#endif
+
+#ifdef USE_ALSA
+#define ALSA_PCM_NEW_HW_PARAMS_API
+#include <alsa/asoundlib.h>
+#endif
+
+#ifdef USE_OPENAL
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <queue>
+#endif
 
 #pragma pack(push, 1)
 typedef struct
@@ -71,6 +101,7 @@ namespace olc
         static float GetMixerOutput(int nChannel, float fGlobalTime, float fTimeStep);
 
     private:
+#ifdef USE_WINDOWS // Windows specific sound management
         static void CALLBACK waveOutProc(HWAVEOUT hWaveOut, UINT uMsg, DWORD dwParam1, DWORD dwParam2);
         static unsigned int m_nSampleRate;
         static unsigned int m_nChannels;
@@ -83,6 +114,28 @@ namespace olc
         static std::atomic<unsigned int> m_nBlockFree;
         static std::condition_variable m_cvBlockNotZero;
         static std::mutex m_muxBlockNotZero;
+#endif
+
+#ifdef USE_ALSA
+        static snd_pcm_t *m_pPCM;
+        static unsigned int m_nSampleRate;
+        static unsigned int m_nChannels;
+        static unsigned int m_nBlockSamples;
+        static short *m_pBlockMemory;
+#endif
+
+#ifdef USE_OPENAL
+        static std::queue<ALuint> m_qAvailableBuffers;
+        static ALuint *m_pBuffers;
+        static ALuint m_nSource;
+        static ALCdevice *m_pDevice;
+        static ALCcontext *m_pContext;
+        static unsigned int m_nSampleRate;
+        static unsigned int m_nChannels;
+        static unsigned int m_nBlockCount;
+        static unsigned int m_nBlockSamples;
+        static short *m_pBlockMemory;
+#endif
 
         static void AudioThread();
         static std::thread m_AudioThread;
@@ -177,8 +230,8 @@ namespace olc
 
         if (pack != nullptr)
         {
-            olc::ResourcePack::sEntry entry = pack->GetStreamBuffer(sWavFile);
-            std::istream is(&entry);
+            olc::ResourceBuffer rb = pack->GetFileBuffer(sWavFile);
+            std::istream is(&rb);
             return ReadWave(is);
         }
         else
@@ -313,6 +366,8 @@ namespace olc
     std::function<float(int, float, float)> SOUND::funcUserFilter = nullptr;
 }
 
+// Implementation, Windows-specific
+#ifdef USE_WINDOWS
 #pragma comment(lib, "winmm.lib")
 
 namespace olc
@@ -377,7 +432,8 @@ namespace olc
     bool SOUND::DestroyAudio()
     {
         m_bAudioThreadActive = false;
-        m_AudioThread.join();
+        if (m_AudioThread.joinable())
+            m_AudioThread.join();
         return false;
     }
 
@@ -404,6 +460,9 @@ namespace olc
         short nMaxSample = (short)pow(2, (sizeof(short) * 8) - 1) - 1;
         float fMaxSample = (float)nMaxSample;
         short nPreviousSample = 0;
+
+        auto tp1 = std::chrono::system_clock::now();
+        auto tp2 = std::chrono::system_clock::now();
 
         while (m_bAudioThreadActive)
         {
@@ -432,18 +491,25 @@ namespace olc
                     return fmax(fSample, -fMax);
             };
 
+            tp2 = std::chrono::system_clock::now();
+            std::chrono::duration<float> elapsedTime = tp2 - tp1;
+            tp1 = tp2;
+
+            // Our time per frame coefficient
+            float fElapsedTime = elapsedTime.count();
+
             for (unsigned int n = 0; n < m_nBlockSamples; n += m_nChannels)
             {
                 // User Process
                 for (unsigned int c = 0; c < m_nChannels; c++)
                 {
-                    nNewSample = (short)(clip(GetMixerOutput(c, m_fGlobalTime, fTimeStep), 1.0) * fMaxSample);
+                    nNewSample = (short)(clip(GetMixerOutput(c, m_fGlobalTime + fTimeStep * (float)n, fTimeStep), 1.0) * fMaxSample);
                     m_pBlockMemory[nCurrentBlock + n + c] = nNewSample;
                     nPreviousSample = nNewSample;
                 }
-
-                m_fGlobalTime = m_fGlobalTime + fTimeStep;
             }
+
+            m_fGlobalTime = m_fGlobalTime + fTimeStep * (float)m_nBlockSamples;
 
             // Send block to sound device
             waveOutPrepareHeader(m_hwDevice, &m_pWaveHeaders[m_nBlockCurrent], sizeof(WAVEHDR));
@@ -466,5 +532,308 @@ namespace olc
     std::mutex SOUND::m_muxBlockNotZero;
 }
 
+#elif defined(USE_ALSA)
+
+namespace olc
+{
+    bool SOUND::InitialiseAudio(unsigned int nSampleRate, unsigned int nChannels, unsigned int nBlocks, unsigned int nBlockSamples)
+    {
+        // Initialise Sound Engine
+        m_bAudioThreadActive = false;
+        m_nSampleRate = nSampleRate;
+        m_nChannels = nChannels;
+        m_nBlockSamples = nBlockSamples;
+        m_pBlockMemory = nullptr;
+
+        // Open PCM stream
+        int rc = snd_pcm_open(&m_pPCM, "default", SND_PCM_STREAM_PLAYBACK, 0);
+        if (rc < 0)
+            return DestroyAudio();
+
+        // Prepare the parameter structure and set default parameters
+        snd_pcm_hw_params_t *params;
+        snd_pcm_hw_params_alloca(&params);
+        snd_pcm_hw_params_any(m_pPCM, params);
+
+        // Set other parameters
+        snd_pcm_hw_params_set_access(m_pPCM, params, SND_PCM_ACCESS_RW_INTERLEAVED);
+        snd_pcm_hw_params_set_format(m_pPCM, params, SND_PCM_FORMAT_S16_LE);
+        snd_pcm_hw_params_set_rate(m_pPCM, params, m_nSampleRate, 0);
+        snd_pcm_hw_params_set_channels(m_pPCM, params, m_nChannels);
+        snd_pcm_hw_params_set_period_size(m_pPCM, params, m_nBlockSamples, 0);
+        snd_pcm_hw_params_set_periods(m_pPCM, params, nBlocks, 0);
+
+        // Save these parameters
+        rc = snd_pcm_hw_params(m_pPCM, params);
+        if (rc < 0)
+            return DestroyAudio();
+
+        listActiveSamples.clear();
+
+        // Allocate Wave|Block Memory
+        m_pBlockMemory = new short[m_nBlockSamples];
+        if (m_pBlockMemory == nullptr)
+            return DestroyAudio();
+        std::fill(m_pBlockMemory, m_pBlockMemory + m_nBlockSamples, 0);
+
+        // Unsure if really needed, helped prevent underrun on my setup
+        snd_pcm_start(m_pPCM);
+        for (unsigned int i = 0; i < nBlocks; i++)
+            rc = snd_pcm_writei(m_pPCM, m_pBlockMemory, 512);
+
+        snd_pcm_start(m_pPCM);
+        m_bAudioThreadActive = true;
+        m_AudioThread = std::thread(&SOUND::AudioThread);
+
+        return true;
+    }
+
+    // Stop and clean up audio system
+    bool SOUND::DestroyAudio()
+    {
+        m_bAudioThreadActive = false;
+        if (m_AudioThread.joinable())
+            m_AudioThread.join();
+        snd_pcm_drain(m_pPCM);
+        snd_pcm_close(m_pPCM);
+        return false;
+    }
+
+    // Audio thread. This loop responds to requests from the soundcard to fill 'blocks'
+    // with audio data. If no requests are available it goes dormant until the sound
+    // card is ready for more data. The block is fille by the "user" in some manner
+    // and then issued to the soundcard.
+    void SOUND::AudioThread()
+    {
+        m_fGlobalTime = 0.0f;
+        static float fTimeStep = 1.0f / (float)m_nSampleRate;
+
+        // Goofy hack to get maximum integer for a type at run-time
+        short nMaxSample = (short)pow(2, (sizeof(short) * 8) - 1) - 1;
+        float fMaxSample = (float)nMaxSample;
+        short nPreviousSample = 0;
+
+        while (m_bAudioThreadActive)
+        {
+            short nNewSample = 0;
+
+            auto clip = [](float fSample, float fMax) {
+                if (fSample >= 0.0)
+                    return fmin(fSample, fMax);
+                else
+                    return fmax(fSample, -fMax);
+            };
+
+            for (unsigned int n = 0; n < m_nBlockSamples; n += m_nChannels)
+            {
+                // User Process
+                for (unsigned int c = 0; c < m_nChannels; c++)
+                {
+                    nNewSample = (short)(GetMixerOutput(c, m_fGlobalTime + fTimeStep * (float)n, fTimeStep), 1.0) * fMaxSample;
+                    m_pBlockMemory[n + c] = nNewSample;
+                    nPreviousSample = nNewSample;
+                }
+            }
+
+            m_fGlobalTime = m_fGlobalTime + fTimeStep * (float)m_nBlockSamples;
+
+            // Send block to sound device
+            snd_pcm_uframes_t nLeft = m_nBlockSamples;
+            short *pBlockPos = m_pBlockMemory;
+            while (nLeft > 0)
+            {
+                int rc = snd_pcm_writei(m_pPCM, pBlockPos, nLeft);
+                if (rc > 0)
+                {
+                    pBlockPos += rc * m_nChannels;
+                    nLeft -= rc;
+                }
+                if (rc == -EAGAIN)
+                    continue;
+                if (rc == -EPIPE) // an underrun occured, prepare the device for more data
+                    snd_pcm_prepare(m_pPCM);
+            }
+        }
+    }
+
+    snd_pcm_t *SOUND::m_pPCM = nullptr;
+    unsigned int SOUND::m_nSampleRate = 0;
+    unsigned int SOUND::m_nChannels = 0;
+    unsigned int SOUND::m_nBlockSamples = 0;
+    short *SOUND::m_pBlockMemory = nullptr;
+}
+
+#elif defined(USE_OPENAL)
+
+namespace olc
+{
+    bool SOUND::InitialiseAudio(unsigned int nSampleRate, unsigned int nChannels, unsigned int nBlocks, unsigned int nBlockSamples)
+    {
+        // Initialise Sound Engine
+        m_bAudioThreadActive = false;
+        m_nSampleRate = nSampleRate;
+        m_nChannels = nChannels;
+        m_nBlockCount = nBlocks;
+        m_nBlockSamples = nBlockSamples;
+        m_pBlockMemory = nullptr;
+
+        // Open the device and create the context
+        m_pDevice = alcOpenDevice(NULL);
+        if (m_pDevice)
+        {
+            m_pContext = alcCreateContext(m_pDevice, NULL);
+            alcMakeContextCurrent(m_pContext);
+        }
+        else
+            return DestroyAudio();
+
+        // Allocate memory for sound data
+        alGetError();
+        m_pBuffers = new ALuint[m_nBlockCount];
+        alGenBuffers(m_nBlockCount, m_pBuffers);
+        alGenSources(1, &m_nSource);
+
+        for (unsigned int i = 0; i < m_nBlockCount; i++)
+            m_qAvailableBuffers.push(m_pBuffers[i]);
+
+        listActiveSamples.clear();
+
+        // Allocate Wave|Block Memory
+        m_pBlockMemory = new short[m_nBlockSamples];
+        if (m_pBlockMemory == nullptr)
+            return DestroyAudio();
+        std::fill(m_pBlockMemory, m_pBlockMemory + m_nBlockSamples, 0);
+
+        m_bAudioThreadActive = true;
+        m_AudioThread = std::thread(&SOUND::AudioThread);
+        return true;
+    }
+
+    // Stop and clean up audio system
+    bool SOUND::DestroyAudio()
+    {
+        m_bAudioThreadActive = false;
+        if (m_AudioThread.joinable())
+            m_AudioThread.join();
+
+        alDeleteBuffers(m_nBlockCount, m_pBuffers);
+        delete[] m_pBuffers;
+        alDeleteSources(1, &m_nSource);
+
+        alcMakeContextCurrent(NULL);
+        alcDestroyContext(m_pContext);
+        alcCloseDevice(m_pDevice);
+        return false;
+    }
+
+    // Audio thread. This loop responds to requests from the soundcard to fill 'blocks'
+    // with audio data. If no requests are available it goes dormant until the sound
+    // card is ready for more data. The block is fille by the "user" in some manner
+    // and then issued to the soundcard.
+    void SOUND::AudioThread()
+    {
+        m_fGlobalTime = 0.0f;
+        static float fTimeStep = 1.0f / (float)m_nSampleRate;
+
+        // Goofy hack to get maximum integer for a type at run-time
+        short nMaxSample = (short)pow(2, (sizeof(short) * 8) - 1) - 1;
+        float fMaxSample = (float)nMaxSample;
+        short nPreviousSample = 0;
+
+        std::vector<ALuint> vProcessed;
+
+        while (m_bAudioThreadActive)
+        {
+            ALint nState, nProcessed;
+            alGetSourcei(m_nSource, AL_SOURCE_STATE, &nState);
+            alGetSourcei(m_nSource, AL_BUFFERS_PROCESSED, &nProcessed);
+
+            // Add processed buffers to our queue
+            vProcessed.resize(nProcessed);
+            alSourceUnqueueBuffers(m_nSource, nProcessed, vProcessed.data());
+            for (ALint nBuf : vProcessed)
+                m_qAvailableBuffers.push(nBuf);
+
+            // Wait until there is a free buffer (ewww)
+            if (m_qAvailableBuffers.empty())
+                continue;
+
+            short nNewSample = 0;
+
+            auto clip = [](float fSample, float fMax) {
+                if (fSample >= 0.0)
+                    return fmin(fSample, fMax);
+                else
+                    return fmax(fSample, -fMax);
+            };
+
+            for (unsigned int n = 0; n < m_nBlockSamples; n += m_nChannels)
+            {
+                // User Process
+                for (unsigned int c = 0; c < m_nChannels; c++)
+                {
+                    nNewSample = (short)(clip(GetMixerOutput(c, m_fGlobalTime, fTimeStep), 1.0) * fMaxSample);
+                    m_pBlockMemory[n + c] = nNewSample;
+                    nPreviousSample = nNewSample;
+                }
+
+                m_fGlobalTime = m_fGlobalTime + fTimeStep;
+            }
+
+            // Fill OpenAL data buffer
+            alBufferData(
+                m_qAvailableBuffers.front(),
+                m_nChannels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16,
+                m_pBlockMemory,
+                2 * m_nBlockSamples,
+                m_nSampleRate);
+            // Add it to the OpenAL queue
+            alSourceQueueBuffers(m_nSource, 1, &m_qAvailableBuffers.front());
+            // Remove it from ours
+            m_qAvailableBuffers.pop();
+
+            // If it's not playing for some reason, change that
+            if (nState != AL_PLAYING)
+                alSourcePlay(m_nSource);
+        }
+    }
+
+    std::queue<ALuint> SOUND::m_qAvailableBuffers;
+    ALuint *SOUND::m_pBuffers = nullptr;
+    ALuint SOUND::m_nSource = 0;
+    ALCdevice *SOUND::m_pDevice = nullptr;
+    ALCcontext *SOUND::m_pContext = nullptr;
+    unsigned int SOUND::m_nSampleRate = 0;
+    unsigned int SOUND::m_nChannels = 0;
+    unsigned int SOUND::m_nBlockCount = 0;
+    unsigned int SOUND::m_nBlockSamples = 0;
+    short *SOUND::m_pBlockMemory = nullptr;
+}
+
+#else // Some other platform
+
+namespace olc
+{
+    bool SOUND::InitialiseAudio(unsigned int nSampleRate, unsigned int nChannels, unsigned int nBlocks, unsigned int nBlockSamples)
+    {
+        return true;
+    }
+
+    // Stop and clean up audio system
+    bool SOUND::DestroyAudio()
+    {
+        return false;
+    }
+
+    // Audio thread. This loop responds to requests from the soundcard to fill 'blocks'
+    // with audio data. If no requests are available it goes dormant until the sound
+    // card is ready for more data. The block is fille by the "user" in some manner
+    // and then issued to the soundcard.
+    void SOUND::AudioThread()
+    {
+    }
+}
+
+#endif
 #endif
 #endif // OLC_PGEX_SOUND

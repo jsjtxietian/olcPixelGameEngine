@@ -124,6 +124,9 @@ private:
         return (rnd() % (max - min)) + min;
     }
 
+    // Modified from this for 64-bit systems:
+    // https://lemire.me/blog/2019/03/19/the-fastest-conventional-random-number-generator-that-can-pass-big-crush/
+    // Now I found the link again - Also, check out his blog, it's a fantastic resource!
     uint32_t rnd()
     {
         nProcGen += 0xe120fc15;
